@@ -147,7 +147,7 @@ env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn
 | Forms | Field, Field Set, Field Group, Label |
 | Display | Avatar, Progress, Meter, Timeline |
 
-Each is a crate (`ui-sdk-select`), re-exported as `ui_sdk::components::select`. The behaviors under them, like roving focus, typeahead, drag and drop, popup placement and gestures, are crates under `ui_sdk::foundation`, for components of your own.
+Related components share crates; `ui-sdk-select` is re-exported as `ui_sdk::components::select`. The behaviors under them, like roving focus, typeahead, drag and drop, popup placement and gestures, are crates under `ui_sdk::foundation`, for components of your own.
 
 ## The Gallery
 
