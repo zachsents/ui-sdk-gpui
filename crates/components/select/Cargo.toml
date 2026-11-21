@@ -1,0 +1,26 @@
+[package]
+name = "ui-sdk-select"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+gpui.workspace = true
+log.workspace = true
+ui-sdk-kernel.workspace = true
+ui-sdk-focus.workspace = true
+ui-sdk-forms.workspace = true
+ui-sdk-lists.workspace = true
+# The content's presence and timing, which its state exposes and its props take.
+ui-sdk-motion.workspace = true
+# The search field inside the list.
+ui-sdk-native.workspace = true
+ui-sdk-platform.workspace = true
+ui-sdk-popups.workspace = true
+ui-sdk-text.workspace = true
+
+[dev-dependencies]
+gpui_platform.workspace = true

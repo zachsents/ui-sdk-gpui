@@ -1,0 +1,20 @@
+[package]
+name = "ui-sdk-image"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+gpui.workspace = true
+log.workspace = true
+ui-sdk-kernel.workspace = true
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
+tiny-skia = "0.11.4"
+# An SVG's own size, its natural size, which gpui's copy of it, drawn at twice
+# that, doesn't give. gpui's own usvg, through resvg, with its features.
+usvg = { version = "0.46.0", default-features = false }
+# Reading an SVG's bytes from a URL, as gpui reads them for `img`.
+futures = "0.3.34"

@@ -1,0 +1,20 @@
+[package]
+name = "ui-sdk-hover-card"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+gpui.workspace = true
+log.workspace = true
+ui-sdk-kernel.workspace = true
+# How the content animates, which its props carry.
+ui-sdk-motion.workspace = true
+ui-sdk-platform.workspace = true
+ui-sdk-popups.workspace = true
+
+[dev-dependencies]
+gpui_platform.workspace = true

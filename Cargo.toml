@@ -1,0 +1,113 @@
+[workspace]
+resolver = "2"
+members = ["crates/kernel", "crates/native", "crates/page", "crates/gallery", "crates/sink", "crates/ui-sdk", "crates/foundation/*", "crates/components/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+repository = "https://github.com/zachsents/ui-sdk-gpui"
+rust-version = "1.98"
+
+[workspace.dependencies]
+gpui = { git = "https://github.com/zed-industries/zed.git", rev = "2f808b3c2de049ecfdbad0fdb26763cebfcaa3b4" }
+gpui_platform = { git = "https://github.com/zed-industries/zed.git", rev = "2f808b3c2de049ecfdbad0fdb26763cebfcaa3b4", features = ["font-kit"] }
+log = "0.4"
+reqwest_client = { git = "https://github.com/zed-industries/zed.git", rev = "2f808b3c2de049ecfdbad0fdb26763cebfcaa3b4" }
+ui-sdk = { path = "crates/ui-sdk" }
+ui-sdk-accordion = { path = "crates/components/accordion" }
+ui-sdk-autocomplete = { path = "crates/components/autocomplete" }
+ui-sdk-avatar = { path = "crates/components/avatar" }
+ui-sdk-button = { path = "crates/components/button" }
+ui-sdk-calendar = { path = "crates/components/calendar" }
+ui-sdk-canvas = { path = "crates/foundation/canvas" }
+ui-sdk-carousel = { path = "crates/components/carousel" }
+ui-sdk-checkbox = { path = "crates/components/checkbox" }
+ui-sdk-collapsible = { path = "crates/components/collapsible" }
+ui-sdk-color = { path = "crates/foundation/color" }
+ui-sdk-color-picker = { path = "crates/components/color-picker" }
+ui-sdk-combobox = { path = "crates/components/combobox" }
+ui-sdk-command = { path = "crates/components/command" }
+ui-sdk-date = { path = "crates/foundation/date" }
+ui-sdk-date-input = { path = "crates/components/date-input" }
+ui-sdk-date-picker = { path = "crates/components/date-picker" }
+ui-sdk-dialog = { path = "crates/components/dialog" }
+ui-sdk-direct-manipulation = { path = "crates/foundation/direct-manipulation" }
+ui-sdk-disclosure = { path = "crates/foundation/disclosure" }
+ui-sdk-drag-and-drop = { path = "crates/foundation/drag-and-drop" }
+ui-sdk-drawer = { path = "crates/components/drawer" }
+ui-sdk-field = { path = "crates/components/field" }
+ui-sdk-file-input = { path = "crates/components/file-input" }
+ui-sdk-focus = { path = "crates/foundation/focus" }
+ui-sdk-forms = { path = "crates/foundation/forms" }
+ui-sdk-gauge = { path = "crates/foundation/gauge" }
+ui-sdk-hover-card = { path = "crates/components/hover-card" }
+ui-sdk-image = { path = "crates/foundation/image" }
+ui-sdk-image-cropper = { path = "crates/components/image-cropper" }
+ui-sdk-input = { path = "crates/components/input" }
+ui-sdk-kernel = { path = "crates/kernel" }
+ui-sdk-label = { path = "crates/components/label" }
+ui-sdk-listbox = { path = "crates/components/listbox" }
+ui-sdk-lists = { path = "crates/foundation/lists" }
+ui-sdk-menu = { path = "crates/components/menu" }
+ui-sdk-meter = { path = "crates/components/meter" }
+ui-sdk-motion = { path = "crates/foundation/motion" }
+ui-sdk-native = { path = "crates/native" }
+ui-sdk-navigation-menu = { path = "crates/components/navigation-menu" }
+ui-sdk-number = { path = "crates/foundation/number" }
+ui-sdk-number-input = { path = "crates/components/number-input" }
+ui-sdk-otp-input = { path = "crates/components/otp-input" }
+ui-sdk-page = { path = "crates/page" }
+ui-sdk-pagination = { path = "crates/components/pagination" }
+ui-sdk-password-input = { path = "crates/components/password-input" }
+ui-sdk-platform = { path = "crates/foundation/platform" }
+ui-sdk-popover = { path = "crates/components/popover" }
+ui-sdk-popups = { path = "crates/foundation/popups" }
+ui-sdk-preferences = { path = "crates/foundation/preferences" }
+ui-sdk-progress = { path = "crates/components/progress" }
+ui-sdk-radio = { path = "crates/components/radio" }
+ui-sdk-rating = { path = "crates/components/rating" }
+ui-sdk-resizable = { path = "crates/components/resizable" }
+ui-sdk-scroll-area = { path = "crates/components/scroll-area" }
+ui-sdk-segmented-control = { path = "crates/components/segmented-control" }
+ui-sdk-select = { path = "crates/components/select" }
+ui-sdk-selection = { path = "crates/foundation/selection" }
+ui-sdk-separator = { path = "crates/components/separator" }
+ui-sdk-sink = { path = "crates/sink" }
+ui-sdk-shortcuts = { path = "crates/foundation/shortcuts" }
+ui-sdk-slider = { path = "crates/components/slider" }
+ui-sdk-storage = { path = "crates/foundation/storage" }
+ui-sdk-switch = { path = "crates/components/switch" }
+ui-sdk-tabs = { path = "crates/components/tabs" }
+ui-sdk-text = { path = "crates/foundation/text" }
+ui-sdk-timeline = { path = "crates/components/timeline" }
+ui-sdk-toast = { path = "crates/components/toast" }
+ui-sdk-toggle = { path = "crates/components/toggle" }
+ui-sdk-token-input = { path = "crates/components/token-input" }
+ui-sdk-toolbar = { path = "crates/components/toolbar" }
+ui-sdk-tooltip = { path = "crates/components/tooltip" }
+ui-sdk-tree = { path = "crates/components/tree" }
+ui-sdk-trigger-menu = { path = "crates/components/trigger-menu" }
+ui-sdk-waterfall = { path = "crates/components/waterfall" }
+
+# Zed's dev profile: gpui's layout engine and proc macros are too slow
+# unoptimized, which shows as lag in debug builds.
+[profile.dev]
+split-debuginfo = "unpacked"
+incremental = true
+codegen-units = 16
+debug = "limited"
+
+[profile.dev.build-override]
+codegen-units = 16
+split-debuginfo = "unpacked"
+debug = "limited"
+
+[profile.dev.package]
+gpui_macros = { opt-level = 3 }
+derive_refineable = { opt-level = 3 }
+quote = { opt-level = 3 }
+syn = { opt-level = 3 }
+proc-macro2 = { opt-level = 3 }
+taffy = { opt-level = 3 }
+resvg = { opt-level = 3 }

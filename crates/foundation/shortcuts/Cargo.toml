@@ -1,0 +1,17 @@
+[package]
+name = "ui-sdk-shortcuts"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+gpui.workspace = true
+log.workspace = true
+ui-sdk-kernel.workspace = true
+# The text field, whose focus is typing (`isTypingIn`).
+ui-sdk-native.workspace = true
+ui-sdk-platform.workspace = true
+ui-sdk-popups.workspace = true

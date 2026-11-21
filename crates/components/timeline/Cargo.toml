@@ -1,0 +1,18 @@
+[package]
+name = "ui-sdk-timeline"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+gpui.workspace = true
+log.workspace = true
+ui-sdk-kernel.workspace = true
+ui-sdk-focus.workspace = true
+ui-sdk-text.workspace = true
+
+[dev-dependencies]
+gpui_platform.workspace = true

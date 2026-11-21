@@ -1,0 +1,17 @@
+[package]
+name = "ui-sdk-avatar"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+gpui.workspace = true
+log.workspace = true
+ui-sdk-image.workspace = true
+ui-sdk-kernel.workspace = true
+
+[dev-dependencies]
+gpui_platform.workspace = true

@@ -1,0 +1,23 @@
+[package]
+name = "ui-sdk-file-input"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+gpui.workspace = true
+log.workspace = true
+ui-sdk-kernel.workspace = true
+ui-sdk-focus.workspace = true
+ui-sdk-forms.workspace = true
+ui-sdk-platform.workspace = true
+# The text field's `Paste` action, which an app's Edit menu or key bindings send.
+ui-sdk-native.workspace = true
+# A file's type from its extension, as a browser types a `File`.
+mime_guess = "2.0.5"
+
+[dev-dependencies]
+gpui_platform.workspace = true

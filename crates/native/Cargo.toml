@@ -1,0 +1,20 @@
+[package]
+name = "ui-sdk-native"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+gpui.workspace = true
+log.workspace = true
+ui-sdk-kernel.workspace = true
+# The app's reading direction, which a style's `Start` and `End` follow.
+ui-sdk-platform.workspace = true
+ui-sdk-text.workspace = true
+unicode-segmentation = "1.12"
+
+[dev-dependencies]
+gpui_platform.workspace = true

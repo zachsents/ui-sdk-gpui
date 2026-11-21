@@ -1,0 +1,24 @@
+[package]
+name = "ui-sdk-otp-input"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+gpui.workspace = true
+log.workspace = true
+ui-sdk-kernel.workspace = true
+ui-sdk-forms.workspace = true
+ui-sdk-native.workspace = true
+ui-sdk-platform.workspace = true
+# A custom pattern, the regular expression each character must match.
+regex = "1.13"
+# `String.prototype.normalize("NFKC")`, which turns a pasted code's
+# full-width digits into plain ones.
+icu_normalizer = "2.4"
+
+[dev-dependencies]
+gpui_platform.workspace = true

@@ -1,0 +1,25 @@
+[package]
+name = "ui-sdk-token-input"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+gpui.workspace = true
+log.workspace = true
+ui-sdk-kernel.workspace = true
+ui-sdk-focus.workspace = true
+ui-sdk-forms.workspace = true
+ui-sdk-native.workspace = true
+ui-sdk-platform.workspace = true
+ui-sdk-text.workspace = true
+# Where a line of text may wrap, as a browser breaks lines (UAX #14).
+unicode-linebreak = "0.1.5"
+# Characters and words as a reader sees them, which the caret steps by.
+unicode-segmentation = "1.12"
+
+[dev-dependencies]
+gpui_platform.workspace = true

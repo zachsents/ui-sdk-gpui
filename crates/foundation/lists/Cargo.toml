@@ -1,0 +1,27 @@
+[package]
+name = "ui-sdk-lists"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+gpui.workspace = true
+log.workspace = true
+ui-sdk-kernel.workspace = true
+ui-sdk-drag-and-drop.workspace = true
+ui-sdk-focus.workspace = true
+ui-sdk-forms.workspace = true
+ui-sdk-motion.workspace = true
+# The input an inline edit types into.
+ui-sdk-native.workspace = true
+ui-sdk-number.workspace = true
+ui-sdk-platform.workspace = true
+ui-sdk-popups.workspace = true
+ui-sdk-text.workspace = true
+futures = "0.3"
+# `Intl.ListFormat`, for `format_labels`.
+icu_list = { version = "2.4.0", features = ["alloc"] }
+icu_locale_core = "2.4.0"

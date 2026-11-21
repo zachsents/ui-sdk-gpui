@@ -1,0 +1,26 @@
+[package]
+name = "ui-sdk-color-picker"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+gpui.workspace = true
+log.workspace = true
+ui-sdk-kernel.workspace = true
+ui-sdk-color.workspace = true
+ui-sdk-direct-manipulation.workspace = true
+ui-sdk-drag-and-drop.workspace = true
+ui-sdk-focus.workspace = true
+ui-sdk-forms.workspace = true
+ui-sdk-native.workspace = true
+ui-sdk-number.workspace = true
+ui-sdk-platform.workspace = true
+# The area's canvas: its pixels, which gpui paints as an image.
+image = { version = "0.25.10", default-features = false }
+
+[dev-dependencies]
+gpui_platform.workspace = true

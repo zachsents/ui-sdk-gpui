@@ -1,0 +1,7 @@
+UI SDK for gpui
+Copyright 2026 Zach Sents
+
+This product is a Rust port of UI SDK (https://github.com/vercel-labs/ui),
+Copyright 2026 Vercel, Inc., licensed under the Apache License, Version 2.0.
+Its source files are translations of UI SDK's TypeScript source and
+documentation comments, changed to run on gpui.

@@ -1,0 +1,20 @@
+[package]
+name = "ui-sdk-text"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+gpui.workspace = true
+log.workspace = true
+ui-sdk-kernel.workspace = true
+icu_casemap = "2.4.0"
+icu_collator = "2.4.0"
+icu_locale = "2.4.0"
+icu_locale_core = "2.4.0"
+icu_normalizer = "2.4.0"
+icu_properties = "2.4.0"
+sys-locale = "0.3.2"

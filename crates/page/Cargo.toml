@@ -1,0 +1,31 @@
+[package]
+name = "ui-sdk-page"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+futures = "0.3"
+gpui.workspace = true
+indexmap = "2"
+log.workspace = true
+regex = "1.13"
+# Results keep the order the original builds its objects in.
+serde_json = { version = "1", features = ["preserve_order"] }
+ui-sdk-kernel.workspace = true
+ui-sdk-forms.workspace = true
+ui-sdk-platform.workspace = true
+ui-sdk-shortcuts.workspace = true
+ui-sdk-text.workspace = true
+
+[dev-dependencies]
+gpui_platform.workspace = true
+ui-sdk-button.workspace = true
+ui-sdk-input.workspace = true
+ui-sdk-native.workspace = true
+ui-sdk-select.workspace = true
+ui-sdk-slider.workspace = true
+ui-sdk-switch.workspace = true

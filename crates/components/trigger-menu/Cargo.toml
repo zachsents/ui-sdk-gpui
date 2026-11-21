@@ -1,0 +1,27 @@
+[package]
+name = "ui-sdk-trigger-menu"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+gpui.workspace = true
+log.workspace = true
+ui-sdk-kernel.workspace = true
+ui-sdk-focus.workspace = true
+ui-sdk-lists.workspace = true
+ui-sdk-platform.workspace = true
+ui-sdk-popups.workspace = true
+ui-sdk-text.workspace = true
+# The input slot binds the native text field, the original's `<textarea>` or `<input>`.
+ui-sdk-native.workspace = true
+# A query's default characters, `/[\p{L}\p{N}\p{M}_\-.]/u`, by general category.
+icu_properties = "2.4.0"
+# An `on_select` future shared between the pending count and the token it inserts.
+futures = "0.3"
+
+[dev-dependencies]
+gpui_platform.workspace = true

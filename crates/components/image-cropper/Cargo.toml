@@ -1,0 +1,26 @@
+[package]
+name = "ui-sdk-image-cropper"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+gpui.workspace = true
+log.workspace = true
+ui-sdk-kernel.workspace = true
+ui-sdk-direct-manipulation.workspace = true
+ui-sdk-drag-and-drop.workspace = true
+ui-sdk-image.workspace = true
+ui-sdk-number.workspace = true
+# The app's reading direction, which the zoom's range runs in, as a native
+# range input's does.
+ui-sdk-platform.workspace = true
+# Turning and flipping the image's pixels, which gpui paints only as they are.
+image = { version = "0.25.10", default-features = false }
+
+[dev-dependencies]
+gpui_platform.workspace = true
+ui-sdk-button.workspace = true

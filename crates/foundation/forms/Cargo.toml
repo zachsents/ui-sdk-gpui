@@ -1,0 +1,19 @@
+[package]
+name = "ui-sdk-forms"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+gpui.workspace = true
+log.workspace = true
+ui-sdk-kernel.workspace = true
+# gpui's own accesskit, for the states gpui has no setter for: required, invalid, read-only, disabled.
+accesskit = "0.24.1"
+fixed_decimal = "0.7.3"
+icu_decimal = { version = "2.4.0", features = ["alloc"] }
+icu_locale_core = "2.4.0"
+sys-locale = "0.3.2"
