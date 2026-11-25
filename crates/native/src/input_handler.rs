@@ -40,7 +40,8 @@ impl TextField {
         if !self.is_editable() {
             return;
         }
-        let text = without_lone_control(text);
+        let control = is_lone_control(text);
+        let text = if control { "" } else { text };
         if let Some(composition) = self.composition.take() {
             let range = range_utf16
                 .map(|range| self.clamp_range(utf16_range_to_offsets(&self.value, &range)))
@@ -52,6 +53,12 @@ impl TextField {
         if let Some(refused) = self.refused_text.take()
             && refused == text
         {
+            return;
+        }
+        // A dropped control character puts nothing in, so it leaves a
+        // selection as it was: Tab out of a field whose text is selected
+        // keeps the text.
+        if control {
             return;
         }
         let selection = self.start..self.end;
@@ -304,12 +311,9 @@ impl TextField {
 
 // Enter, Tab and Backspace arrive as keys. A platform that also sends their
 // control character as text has it dropped here.
-fn without_lone_control(text: &str) -> &str {
+fn is_lone_control(text: &str) -> bool {
     let mut chars = text.chars();
-    match (chars.next(), chars.next()) {
-        (Some(c), None) if c.is_control() => "",
-        _ => text,
-    }
+    matches!((chars.next(), chars.next()), (Some(c), None) if c.is_control())
 }
 
 impl EntityInputHandler for TextField {
