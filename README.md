@@ -17,7 +17,7 @@ Depend on a tag of this repository, with gpui from the Zed revision that tag pin
 
 ```toml
 [dependencies]
-ui-sdk = { git = "https://github.com/zachsents/ui-sdk-gpui", tag = "v0.3.0" }
+ui-sdk = { git = "https://github.com/zachsents/ui-sdk-gpui", tag = "v0.4.0" }
 gpui = { git = "https://github.com/zed-industries/zed.git", rev = "2f808b3c2de049ecfdbad0fdb26763cebfcaa3b4" }
 gpui_platform = { git = "https://github.com/zed-industries/zed.git", rev = "2f808b3c2de049ecfdbad0fdb26763cebfcaa3b4", features = ["font-kit"] }
 env_logger = "0.11"
