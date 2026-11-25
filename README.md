@@ -159,6 +159,35 @@ cargo run --release -p ui-sdk-gallery
 
 Or one at a time: `cargo run -p ui-sdk-select --example select`.
 
+## Hot Reloading
+
+The `hot-reload` feature patches a change to a render into the running app, without restarting it or losing its state. It's gpui's own hot reloading, on Dioxus's [Subsecond](https://github.com/DioxusLabs/dioxus/tree/main/packages/subsecond): every view's and component's render passes through a patchable boundary, and the window draws again once a patch lands. It's on in debug builds only, so a release build has none of it, feature or not.
+
+Give your app a feature that turns on the kit's:
+
+```toml
+[features]
+hot-reload = ["ui-sdk/hot-reload"]
+```
+
+Then run it through [`dx`](https://github.com/DioxusLabs/dioxus/tree/main/packages/cli), at the version gpui's Subsecond is pinned to (0.7.10):
+
+```sh
+cargo binstall dioxus-cli@0.7.10   # or: cargo install dioxus-cli@0.7.10 --locked
+dx serve --hot-patch --platform macos --features hot-reload
+```
+
+The gallery runs the same way: `dx serve --hot-patch --platform macos -p ui-sdk-gallery --features hot-reload`.
+
+Save a change to a `render`, or to code it calls, and it shows on the next frame. What doesn't patch, `dx` rebuilds and relaunches:
+
+- A change to a type's layout: a field added to a struct, a variant to an enum.
+- Code only a custom `Element`'s `request_layout`, `prepaint` or `paint` runs, outside a render.
+- Closures and values made once and kept, like an entity's state, a listener set in `new`, or a spawned task; they keep running the code they were made with until made again.
+- Dependencies outside your workspace, the kit among them (its crates come from git or crates.io), and `build.rs`.
+
+Each patch is the crate you ran with `dx`, built again, with its own copy of every `static` and thread-local that crate defines, starting from its initial value. Keep what must last a patch out of it: a `static` holding state (an outbox, a flag, a child process), a thread-local that remembers, an Objective-C class (`objc2::define_class!` registers it once and finds its ivars through statics). Put them in a library crate of your workspace that the app calls into; a patch calls that crate's copy. A cache that's rebuilt when it's empty (a `LazyLock<Regex>`) can stay.
+
 ## Status
 
 - Ports `@ui-sdk/core` 0.1.0-beta.13 ([`vercel-labs/ui@855bc7f`](https://github.com/vercel-labs/ui/tree/855bc7fd4df3d61aee33d9d975dc3e4f71debc6c), November 20, 2026), including the agent bridge, `observe` and undo history.

@@ -83,5 +83,11 @@ ui-sdk-tree.workspace = true
 ui-sdk-trigger-menu.workspace = true
 ui-sdk-waterfall.workspace = true
 
+[features]
+# Hot reloading (README, Hot Reloading): every view's and component's render, and the app code it
+# calls, patched into the running app by `dx serve --hot-patch`. gpui turns it on in debug builds
+# only, so a release build has none of it even with the feature on.
+hot-reload = ["gpui/hot-reload"]
+
 [dev-dependencies]
 gpui_platform.workspace = true
