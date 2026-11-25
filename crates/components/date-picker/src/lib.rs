@@ -30,6 +30,11 @@
 //!   `end_placeholder`, `field_style`). The text is written to the field from
 //!   the state once the update that changed it is over, or at once from
 //!   `set_options`, which takes the window for it.
+//! - An input takes only typing and pasting that leave its text a date, or
+//!   the start of one in any form it reads ("1", "10/1", "oct"), as Date
+//!   Input's segments take only what makes a date; the original's input
+//!   takes any text and marks it invalid once committed. Deleting always
+//!   goes through, so text that isn't a date still commits as invalid.
 //! - What the browser does with a native input is the picker's: Enter
 //!   submits its form implicitly once the typed date is committed, and the
 //!   form hears `Input` as you type and `Change` as an edit is committed.

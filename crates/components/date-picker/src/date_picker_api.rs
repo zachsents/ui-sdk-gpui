@@ -24,8 +24,9 @@ use ui_sdk_calendar::{
     is_allowed_range, normalize_value, selected_dates,
 };
 use ui_sdk_date::{
-    DateTimeFormatOptions, ISODate, MonthWidth, NumericWidth, ParseDateOptions, clamp_date, format_date,
-    is_iso_date, parse_date,
+    DateField, DateTimeFormatOptions, DateTimeFormatPartType, DateTimeStyle, DateTimeValue, ISODate, MonthWidth,
+    NumericWidth, ParseDateOptions, TextWidth, clamp_date, date_formatter, date_pattern, format_date, is_iso_date,
+    month_names, parse_date,
 };
 use ui_sdk_forms::{
     ElementInternals, FormData, FormEventType, FormValue, InternalsOptions, Node, Problem, ValidityFlag,
@@ -101,6 +102,64 @@ enum Reading {
     NotADate,
 }
 
+// The words dates are typed with in a locale, lowercase: its month names,
+// long and short, alone and inside a date, and English ones; and the words
+// its written dates hold. `first_month` is January's long name.
+struct DateWords {
+    all: Vec<String>,
+    first_month: String,
+}
+
+thread_local! {
+    static DATE_WORDS: RefCell<std::collections::HashMap<String, Rc<DateWords>>> = RefCell::default();
+}
+
+fn date_words(locale: &str) -> Rc<DateWords> {
+    if let Some(words) = DATE_WORDS.with(|words| words.borrow().get(locale).cloned()) {
+        return words;
+    }
+    let mut all: Vec<String> = Vec::new();
+    let mut add = |word: &str| {
+        let word = word.to_lowercase();
+        let word = word.trim_end_matches('.').trim();
+        if !word.is_empty() && !all.iter().any(|each| each == word) {
+            all.push(word.to_string());
+        }
+    };
+    for language in [locale, "en"] {
+        for width in [TextWidth::Long, TextWidth::Short] {
+            for name in month_names(Some(language), width) {
+                add(&name);
+            }
+            let in_date = date_formatter(
+                Some(language),
+                &DateTimeFormatOptions::default()
+                    .day(NumericWidth::Numeric)
+                    .month(MonthWidth::from(width)),
+            );
+            for month in 1..=12 {
+                let parts = in_date.format_to_parts(DateTimeValue::new(2026, month, 16));
+                if let Some(name) = parts.iter().find(|part| part.r#type == DateTimeFormatPartType::Month) {
+                    add(&name.value);
+                }
+            }
+        }
+    }
+    for style in [DateTimeStyle::Medium, DateTimeStyle::Long, DateTimeStyle::Full] {
+        let parts = date_formatter(Some(locale), &DateTimeFormatOptions::default().date_style(style))
+            .format_to_parts(DateTimeValue::new(2026, 10, 16));
+        for part in parts.iter().filter(|part| part.r#type == DateTimeFormatPartType::Literal) {
+            for word in part.value.split(|c: char| !c.is_alphabetic()) {
+                add(word);
+            }
+        }
+    }
+    let first_month = month_names(Some(locale), TextWidth::Long)[0].to_lowercase();
+    let words = Rc::new(DateWords { all, first_month });
+    DATE_WORDS.with(|cache| cache.borrow_mut().insert(locale.to_string(), words.clone()));
+    words
+}
+
 // What a range's ends submit under, or a date's (`nameAt`).
 fn name_at(picker: &DatePicker, index: usize, name: Option<&SharedString>) -> Option<SharedString> {
     if picker.model.mode() != CalendarMode::Range {
@@ -156,10 +215,28 @@ impl Anchors {
 // The options an input's text field takes, with the hooks that hand what
 // happens in it to the picker, as the original's listeners on the input do.
 fn field_options(index: usize, picker: gpui::WeakEntity<DatePicker>) -> TextFieldOptions {
+    let reads = picker.clone();
     let typed = picker.clone();
     let committed = picker.clone();
     let left = picker;
     TextFieldOptions::default()
+        // Typing and pasting put in only what leaves a date, or the start of
+        // one, as a date input's segments take only what makes a date.
+        // Deleting always goes through.
+        .on_before_input(move |field, edit, _window, cx| {
+            if edit.inserted.is_empty() || edit.composing {
+                return;
+            }
+            let value = field.value();
+            let next = format!("{}{}{}", &value[..edit.range.start], edit.inserted, &value[edit.range.end..]);
+            let caret = edit.range.start + edit.inserted.len();
+            let Some(picker) = reads.upgrade() else {
+                return;
+            };
+            if !picker.read(cx).could_be_date(&next, caret, cx) {
+                edit.prevent_default();
+            }
+        })
         .on_input(move |field, _edit, window, cx| {
             let text = field.value().clone();
             typed
@@ -875,6 +952,93 @@ impl DatePicker {
             reference_date: self.model.today().cloned(),
         };
         parse_date(text, Some(&locale), &options).map_or(Reading::NotADate, Reading::Date)
+    }
+
+    // Whether an input's text is a date, or could become one as more is
+    // typed at the caret or the end: some ending, a digit at the caret, or
+    // the rest of a month's name, makes it a date `parse_date` reads.
+    fn could_be_date(&self, text: &str, caret: usize, cx: &App) -> bool {
+        let locale = self.model.locale(cx);
+        let options = ParseDateOptions {
+            reference_date: self.model.today().cloned(),
+        };
+        let reads = |text: &str| parse_date(text, Some(&locale), &options).is_some();
+        if js_trim(text).is_empty() || reads(text) {
+            return true;
+        }
+        let words = date_words(&locale);
+        let pattern = date_pattern(Some(&locale));
+        let separator = match js_trim(&pattern.separator) {
+            "" => "/".to_string(),
+            separator => separator.to_string(),
+        };
+        // Endings: more numbers after the separator or a space (1 fits a
+        // day, a month and a year; 2000 is a leap year), or after a lone
+        // number, a month's name, as in "16 October".
+        let mut endings = vec![String::new()];
+        for between in [separator.as_str(), " "] {
+            for first in ["1", "2000"] {
+                endings.push(format!("{between}{first}"));
+                for second in ["1", "2000"] {
+                    endings.push(format!("{between}{first}{between}{second}"));
+                }
+            }
+        }
+        if js_trim(text).chars().all(char::is_numeric) {
+            let month = &words.first_month;
+            for after in ["", " 1", " 2000", " 1 2000", " 2000 1"] {
+                endings.push(format!(" {month}{after}"));
+            }
+        }
+        let ends = |text: &str| endings.iter().any(|ending| reads(&format!("{text}{ending}")));
+        let (before, after) = text.split_at(caret);
+        let digit = |digit: char| ends(&format!("{before}{digit}{after}"));
+        if ends(text) || ('0'..='9').any(digit) {
+            return true;
+        }
+        if !after.is_empty() {
+            return false;
+        }
+        // Dates written in digits of fixed widths: ISO, and digits alone, six
+        // or eight, in the locale's order.
+        let digits_alone = |year: &str, month: &str, day: &str| -> String {
+            pattern
+                .fields
+                .iter()
+                .map(|field| match field {
+                    DateField::Year => year,
+                    DateField::Month => month,
+                    DateField::Day => day,
+                })
+                .collect()
+        };
+        let mut fixed = Vec::new();
+        for (month, day) in [("01", "01"), ("10", "10"), ("01", "10"), ("10", "01")] {
+            fixed.push(format!("2000-{month}-{day}"));
+            fixed.push(digits_alone("00", month, day));
+            fixed.push(digits_alone("2000", month, day));
+        }
+        let length = text.len();
+        let filled = fixed.iter().any(|form| {
+            form.len() > length && form.is_char_boundary(length) && reads(&format!("{text}{}", &form[length..]))
+        });
+        if filled {
+            return true;
+        }
+        // A word begun: the rest of a month's name, or of a word the
+        // locale's dates hold, like Spanish "de".
+        let lower = text.to_lowercase();
+        words.all.iter().any(|word| {
+            word.char_indices().skip(1).map(|(at, _)| at).chain([word.len()]).any(|at| {
+                let begun = &word[..at];
+                lower.ends_with(begun)
+                    && !lower[..lower.len() - begun.len()]
+                        .chars()
+                        .next_back()
+                        .is_some_and(char::is_alphabetic)
+                    && ends(&format!("{text}{}", &word[at..]))
+            })
+        })
     }
 
     /// Enter or blur on an input: a typed date becomes the value, or the
