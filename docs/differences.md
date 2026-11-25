@@ -30,6 +30,7 @@ Each crate's API docs (`cargo doc --open -p ui-sdk`) list its drops and deviatio
 | `localStorage` and `sessionStorage` | The storage crate. Local storage is `local-storage.json` in the directory `ui_sdk::init` names, in the platform's data directory (`~/Library/Application Support/<name>` on a Mac). Session storage lasts while the app runs. |
 | `matchMedia` | `window.appearance()`, or the preferences crate's `ColorScheme`, for the color scheme, and the app-set `cx.reduce_motion()` flag for reduced motion; gpui does not read it from the system. |
 | `<input>` and `<textarea>` | `ui_sdk::native::TextField`. Components that take text make their own. |
+| Selecting and copying a page's text | `ui_sdk::native::SelectableText`: runs of words sharing a `TextSelection`, selected by drag, double click (words) and triple click (paragraphs), as a browser's. |
 | `<form>`, `<fieldset>`, `<label>` and `FormData` | `Form`, `Fieldset`, `Label` and `FormData` in `ui_sdk::foundation::forms`. A form hands what it submits to its `on_submit`. |
 | `<button type="submit">` | A `Button` with `.r#type(ButtonType::Submit)`. |
 | Text an element renders | Props, like an item's `text` or `label` and a tooltip's `text`. gpui can't read text back from an element. |

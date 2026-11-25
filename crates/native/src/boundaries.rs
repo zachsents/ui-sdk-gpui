@@ -1,10 +1,31 @@
 //! Where the caret stops in text: characters as a reader sees them
 //! (grapheme clusters), words as Unicode segments them, paragraphs between
 //! line breaks, and the offsets platform text APIs count in UTF-16.
+//!
+//! Words are Unicode's (UAX #29), with dictionaries for the scripts written
+//! without spaces (Chinese, Japanese, Thai, Khmer, Lao, Burmese), as a Mac's
+//! text does: a double click on `日本語を話す` selects `日本語`, not `日`.
 
 use std::ops::Range;
 
+use icu_segmenter::WordSegmenter;
+use icu_segmenter::options::WordBreakInvariantOptions;
 use unicode_segmentation::UnicodeSegmentation;
+
+/// The text cut into words, runs of spaces and single marks of punctuation,
+/// each with where it starts.
+fn word_segments(text: &str) -> Vec<(usize, &str)> {
+    let segmenter = WordSegmenter::new_dictionary(WordBreakInvariantOptions::default());
+    let mut out = Vec::new();
+    let mut last = 0;
+    for at in segmenter.segment_str(text) {
+        if at > last {
+            out.push((last, &text[last..at]));
+        }
+        last = at;
+    }
+    out
+}
 
 /// The nearest character boundary at or before `offset`.
 pub(crate) fn floor_char(text: &str, offset: usize) -> usize {
@@ -57,8 +78,8 @@ fn is_space(segment: &str) -> bool {
 /// The start of the word before `offset`: Option-Left on a Mac, Control-Left
 /// elsewhere.
 pub(crate) fn previous_word_start(text: &str, offset: usize) -> usize {
-    text[..offset]
-        .split_word_bound_indices()
+    word_segments(&text[..offset])
+        .into_iter()
         .rev()
         .find(|(_, segment)| is_word(segment))
         .map(|(start, _)| start)
@@ -68,8 +89,8 @@ pub(crate) fn previous_word_start(text: &str, offset: usize) -> usize {
 /// The end of the word after `offset`: Option-Right on a Mac, Control-Right
 /// on Linux.
 pub(crate) fn next_word_end(text: &str, offset: usize) -> usize {
-    text[offset..]
-        .split_word_bound_indices()
+    word_segments(&text[offset..])
+        .into_iter()
         .find(|(_, segment)| is_word(segment))
         .map(|(start, segment)| offset + start + segment.len())
         .unwrap_or(text.len())
@@ -78,7 +99,7 @@ pub(crate) fn next_word_end(text: &str, offset: usize) -> usize {
 /// The start of the word after the one at `offset`: Control-Right on Windows.
 pub(crate) fn next_word_start(text: &str, offset: usize) -> usize {
     let mut first = true;
-    for (start, segment) in text[offset..].split_word_bound_indices() {
+    for (start, segment) in word_segments(&text[offset..]) {
         let space = is_space(segment);
         if first {
             first = false;
@@ -94,14 +115,15 @@ pub(crate) fn next_word_start(text: &str, offset: usize) -> usize {
 }
 
 /// The word, run of spaces or punctuation that the character starting at
-/// `offset` belongs to, what a double click selects.
-pub(crate) fn word_at(text: &str, offset: usize) -> Range<usize> {
+/// `offset` belongs to, what a double click selects. At the end of the text
+/// or of a paragraph, the word before it.
+pub fn word_at(text: &str, offset: usize) -> Range<usize> {
     if text.is_empty() {
         return 0..0;
     }
     let offset = offset.min(text.len());
     let mut last = 0..0;
-    for (start, segment) in text.split_word_bound_indices() {
+    for (start, segment) in word_segments(text) {
         let end = start + segment.len();
         if offset < end {
             if segment == "\n" && start > 0 {
@@ -112,6 +134,13 @@ pub(crate) fn word_at(text: &str, offset: usize) -> Range<usize> {
         last = start..end;
     }
     last
+}
+
+/// The paragraph `offset` is in, without its line break: what a triple
+/// click selects.
+pub fn paragraph_at(text: &str, offset: usize) -> Range<usize> {
+    let offset = floor_char(text, offset);
+    paragraph_start(text, offset)..paragraph_end(text, offset)
 }
 
 /// The start of the paragraph `offset` is in.

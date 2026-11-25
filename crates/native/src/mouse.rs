@@ -1,6 +1,7 @@
 //! Selecting with the mouse: a press puts the caret, Shift extends, a
 //! double press selects a word and a triple press a line, and dragging
-//! extends by the same unit. The wheel scrolls text that overflows.
+//! extends by the same unit, as does a Shift press after them while the
+//! selection is still theirs. The wheel scrolls text that overflows.
 //!
 //! The field's handlers are the first on its part, so ones the app adds
 //! there run before them, as a `mousedown` listener runs before the
@@ -69,6 +70,20 @@ impl TextField {
         };
         match event.click_count {
             0 | 1 => {
+                // A Shift press after a double or triple press extends by its
+                // unit, while what it selected is still the selection.
+                let unit = self
+                    .unit
+                    .clone()
+                    .filter(|(_, selected)| *selected == self.selection())
+                    .map(|(drag, _)| drag);
+                if let Some(drag) = unit.filter(|_| event.modifiers.shift) {
+                    self.extend_by_unit(&drag, event.position);
+                    self.drag = Some(drag);
+                    self.changed(window, cx);
+                    return;
+                }
+                self.unit = None;
                 if event.modifiers.shift {
                     let anchor = self.anchor();
                     self.select_to(anchor, offset, upstream);
@@ -84,19 +99,23 @@ impl TextField {
                 let word = self.word_under(event.position);
                 self.set_selection_quiet(word.start, word.end, SelectionDirection::None);
                 self.upstream = false;
-                self.drag = Some(Drag {
+                let drag = Drag {
                     granularity: Granularity::Word,
                     origin: word,
-                });
+                };
+                self.unit = Some((drag.clone(), self.selection()));
+                self.drag = Some(drag);
             }
             _ => {
                 let line = self.line_under(event.position);
                 self.set_selection_quiet(line.start, line.end, SelectionDirection::None);
                 self.upstream = false;
-                self.drag = Some(Drag {
+                let drag = Drag {
                     granularity: Granularity::Line,
                     origin: line,
-                });
+                };
+                self.unit = Some((drag.clone(), self.selection()));
+                self.drag = Some(drag);
             }
         }
         self.changed(window, cx);
@@ -118,19 +137,26 @@ impl TextField {
         match drag.granularity {
             Granularity::Character => self.select_to(drag.origin.start, offset, upstream),
             Granularity::Word | Granularity::Line => {
-                let unit = if drag.granularity == Granularity::Word {
-                    self.word_under(position)
-                } else {
-                    self.line_under(position)
-                };
-                if unit.start < drag.origin.start {
-                    self.select_to(drag.origin.end, unit.start, false);
-                } else {
-                    self.select_to(drag.origin.start, unit.end.max(drag.origin.end), false);
-                }
+                self.extend_by_unit(&drag, position);
+                self.unit = Some((drag, self.selection()));
             }
         }
         self.changed(window, cx);
+    }
+
+    // Extends what a double or triple press selected to the word or line at
+    // a position, keeping it selected whichever way the pointer goes.
+    fn extend_by_unit(&mut self, drag: &Drag, position: Point<Pixels>) {
+        let unit = if drag.granularity == Granularity::Word {
+            self.word_under(position)
+        } else {
+            self.line_under(position)
+        };
+        if unit.start < drag.origin.start {
+            self.select_to(drag.origin.end, unit.start, false);
+        } else {
+            self.select_to(drag.origin.start, unit.end.max(drag.origin.end), false);
+        }
     }
 
     pub(crate) fn end_drag(&mut self) {

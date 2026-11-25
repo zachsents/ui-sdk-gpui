@@ -452,6 +452,9 @@ pub struct TextField {
     pub(crate) autoscroll: bool,
     pub(crate) geometry: Option<Geometry>,
     pub(crate) drag: Option<Drag>,
+    // The last double or triple press's unit, and what it had selected, which
+    // a Shift press extends by.
+    pub(crate) unit: Option<(Drag, Range<usize>)>,
     // Text a refused key would have typed, which the platform still sends.
     pub(crate) refused_text: Option<String>,
     pub(crate) expanded: bool,
@@ -534,6 +537,7 @@ impl TextField {
             autoscroll: true,
             geometry: None,
             drag: None,
+            unit: None,
             refused_text: None,
             expanded: false,
             a11y: Rc::new(RefCell::new(A11ySnapshot::default())),
