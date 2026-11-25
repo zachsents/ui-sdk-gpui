@@ -5908,7 +5908,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -5989,7 +5989,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-accordion"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6002,7 +6002,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-autocomplete"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6020,7 +6020,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-avatar"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6031,7 +6031,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-button"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6043,7 +6043,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-calendar"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6059,7 +6059,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-canvas"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "log",
@@ -6071,7 +6071,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-carousel"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6088,7 +6088,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-checkbox"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6101,7 +6101,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-collapsible"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6114,7 +6114,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-color"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "log",
@@ -6123,7 +6123,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-color-picker"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6142,7 +6142,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-combobox"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6160,7 +6160,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-command"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "futures",
  "gpui",
@@ -6177,7 +6177,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-date"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "icu_calendar",
@@ -6198,7 +6198,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-date-input"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6217,7 +6217,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-date-picker"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6236,7 +6236,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-dialog"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "futures",
  "gpui",
@@ -6253,7 +6253,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-direct-manipulation"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "log",
@@ -6267,7 +6267,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-disclosure"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "log",
@@ -6277,7 +6277,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-drag-and-drop"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "log",
@@ -6290,7 +6290,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-drawer"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6304,7 +6304,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-field"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6320,7 +6320,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-file-input"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6335,7 +6335,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-focus"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "log",
@@ -6345,7 +6345,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-forms"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "accesskit",
  "fixed_decimal",
@@ -6359,7 +6359,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-gallery"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "env_logger",
  "futures",
@@ -6441,7 +6441,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-gauge"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "log",
@@ -6452,7 +6452,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-hover-card"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6465,7 +6465,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-image"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "futures",
  "gpui",
@@ -6478,7 +6478,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-image-cropper"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6495,7 +6495,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-input"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6510,7 +6510,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-kernel"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "accesskit",
  "futures",
@@ -6521,7 +6521,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-label"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6533,7 +6533,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-listbox"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6549,7 +6549,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-lists"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "futures",
  "gpui",
@@ -6570,7 +6570,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-menu"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "futures",
  "gpui",
@@ -6589,7 +6589,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-meter"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6603,7 +6603,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-motion"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "log",
@@ -6612,7 +6612,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-native"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6626,7 +6626,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-navigation-menu"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6643,7 +6643,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-number"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "fixed_decimal",
  "gpui",
@@ -6664,7 +6664,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-number-input"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6682,7 +6682,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-otp-input"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6697,7 +6697,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-page"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "futures",
  "gpui",
@@ -6721,7 +6721,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-pagination"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6733,7 +6733,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-password-input"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6747,7 +6747,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-platform"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "log",
@@ -6757,7 +6757,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-popover"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6770,7 +6770,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-popups"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "futures",
  "gpui",
@@ -6783,7 +6783,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-preferences"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "ui-sdk-kernel",
@@ -6792,7 +6792,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-progress"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6806,7 +6806,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-radio"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6819,7 +6819,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-rating"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6832,7 +6832,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-resizable"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6849,7 +6849,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-scroll-area"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6863,7 +6863,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-segmented-control"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6878,7 +6878,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-select"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6896,7 +6896,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-selection"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "log",
@@ -6908,7 +6908,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-separator"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6918,7 +6918,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-shortcuts"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "log",
@@ -6930,7 +6930,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-sink"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6955,7 +6955,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-slider"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6971,7 +6971,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-storage"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "dirs",
  "gpui",
@@ -6981,7 +6981,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-switch"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -6992,7 +6992,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-tabs"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -7008,7 +7008,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-text"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "icu_casemap",
@@ -7024,7 +7024,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-timeline"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -7036,7 +7036,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-toast"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -7055,7 +7055,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-toggle"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -7069,7 +7069,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-token-input"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -7086,7 +7086,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-toolbar"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -7101,7 +7101,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-tooltip"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -7116,7 +7116,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-tree"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
@@ -7135,7 +7135,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-trigger-menu"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "futures",
  "gpui",
@@ -7153,7 +7153,7 @@ dependencies = [
 
 [[package]]
 name = "ui-sdk-waterfall"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "gpui",
  "gpui_platform",
