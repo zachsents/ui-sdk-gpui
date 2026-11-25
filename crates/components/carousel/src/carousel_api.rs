@@ -16,7 +16,7 @@ use std::mem;
 use gpui::{Context, SharedString, Window};
 use ui_sdk_drag_and_drop::PointerEvent;
 use ui_sdk_kernel::modality::focus_event;
-use ui_sdk_kernel::{ChangeOptions, InputEvent, Reason, held, is_focus_from_keyboard};
+use ui_sdk_kernel::{ChangeOptions, InputEvent, Reason, after_update, held, is_focus_from_keyboard};
 use ui_sdk_motion::SheetPhysics;
 use ui_sdk_number::clamp;
 use ui_sdk_platform::{is_rtl, prefers_reduced_motion};
@@ -423,7 +423,8 @@ impl Carousel {
         }
         self.recenter(window, cx);
         if let Some(complete) = self.on_page_change_complete.clone() {
-            complete(*self.page.get(), window, cx);
+            let page = *self.page.get();
+            after_update(window, cx, move |window, cx| complete(page, window, cx));
         }
     }
 

@@ -19,7 +19,9 @@ use ui_sdk_forms::{
     is_disabled, keeps_value_on_reset, validate_files, value_missing_message,
 };
 use ui_sdk_kernel::modality::window_source;
-use ui_sdk_kernel::{ChangeCallback, ChangeDetails, ChangeOptions, InputEvent, Key, Reason, dispatch};
+use ui_sdk_kernel::{
+    ChangeCallback, ChangeDetails, ChangeOptions, InputEvent, Key, Reason, after_update, dispatch,
+};
 use ui_sdk_platform::{announce, is_rtl};
 
 pub use ui_sdk_forms::DragStatus;
@@ -351,8 +353,13 @@ impl FileInput {
         let changed = differs && self.change_value(next, &change, options.clone(), window, cx);
         // After the change, so a handler that clears messages on a change
         // doesn't clear the ones for this batch's rejections.
-        if !change.rejected.is_empty() {
-            dispatch(self.on_reject.as_ref(), change.rejected.as_slice(), options, window, cx);
+        if !change.rejected.is_empty()
+            && let Some(callback) = self.on_reject.clone()
+        {
+            let rejected = change.rejected.clone();
+            after_update(window, cx, move |window, cx| {
+                dispatch(Some(&callback), rejected.as_slice(), options, window, cx);
+            });
         }
         // A canceled change leaves the form's files as they were, and says
         // nothing.

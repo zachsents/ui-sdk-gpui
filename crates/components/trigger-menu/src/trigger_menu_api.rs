@@ -9,7 +9,7 @@
 //! without reading the menu, since the menu is mid-update while it writes.
 
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::rc::{Rc, Weak};
 use std::time::Duration;
 
@@ -21,7 +21,7 @@ use gpui::{
 use ui_sdk_kernel::bound_keys::bound;
 use ui_sdk_kernel::part::held;
 use ui_sdk_kernel::{
-    AnnouncePending, Aria, AutoComplete, ChangeDetails, HasPopup, InputEvent, Instance, Reason, change_source,
+    AnnouncePending, Aria, AutoComplete, ChangeDetails, HasPopup, InputEvent, Instance, Reason, after_update, change_source,
     flag_while_bound, is_composing, with_source,
 };
 use ui_sdk_lists::{
@@ -179,6 +179,8 @@ pub struct TriggerMenu {
     pub(crate) editor_region: Region,
     // The trigger `on_open_change` hears, read inside the popup's change.
     open_trigger: Rc<RefCell<Option<SharedString>>>,
+    // The triggers of changes whose `on_open_change` hasn't run yet.
+    heard_triggers: Rc<RefCell<VecDeque<Option<SharedString>>>>,
     pub(crate) content_props: Rc<RefCell<TriggerMenuContentProps>>,
     // What each item last rendered with (`context.props("item", key)`).
     pub(crate) item_props: RefCell<HashMap<SharedString, TriggerMenuItemProps>>,
@@ -242,22 +244,49 @@ fn same_items(a: Option<&TriggerMenuData>, b: Option<&TriggerMenuData>) -> bool 
     }
 }
 
-// The popup's options from the menu's: `on_open_change` hears the trigger
-// beside the details (`details`).
-fn popup_options(options: &TriggerMenuOptions, trigger: &Rc<RefCell<Option<SharedString>>>) -> PopupOptions<()> {
-    let on_open_change = options.on_open_change.clone().map(|callback| {
+// The popup's options from the menu's: `on_before_open_change` and
+// `on_open_change` hear the trigger beside the details (`details`). Each
+// change that goes through leaves the trigger it had in `heard` for
+// `on_open_change`, which runs once the update is over, when the menu may
+// have moved on to another.
+fn popup_options(
+    options: &TriggerMenuOptions,
+    trigger: &Rc<RefCell<Option<SharedString>>>,
+    heard: &Rc<RefCell<VecDeque<Option<SharedString>>>>,
+) -> PopupOptions<()> {
+    let on_before_open_change = {
+        let before = options.on_before_open_change.clone();
         let trigger = trigger.clone();
+        let heard = heard.clone();
         Rc::new(
             move |open: &bool, details: &ChangeDetails, _: Option<&SharedString>, window: &mut Window, cx: &mut App| {
                 let trigger = trigger.borrow().clone();
-                callback(open, details, trigger.as_ref(), window, cx);
+                if let Some(before) = &before {
+                    before(open, details, trigger.as_ref(), window, cx);
+                }
+                if !details.canceled() {
+                    heard.borrow_mut().push_back(trigger);
+                }
             },
         ) as PopupOpenChangeCallback
-    });
+    };
+    let on_open_change = {
+        let callback = options.on_open_change.clone();
+        let heard = heard.clone();
+        Rc::new(
+            move |open: &bool, details: &ChangeDetails, _: Option<&SharedString>, window: &mut Window, cx: &mut App| {
+                let trigger = heard.borrow_mut().pop_front().flatten();
+                if let Some(callback) = &callback {
+                    callback(open, details, trigger.as_ref(), window, cx);
+                }
+            },
+        ) as PopupOpenChangeCallback
+    };
     PopupOptions {
         open: options.open,
         default_open: false,
-        on_open_change,
+        on_open_change: Some(on_open_change),
+        on_before_open_change: Some(on_before_open_change),
         on_open_change_complete: options.on_open_change_complete.clone(),
         dismissible: options.dismissible,
         on_dismiss_attempt: options.on_dismiss_attempt.clone(),
@@ -398,12 +427,13 @@ impl TriggerMenu {
         instance.debug = options.debug;
         let editor_region = Region::new();
         let open_trigger: Rc<RefCell<Option<SharedString>>> = Rc::default();
+        let heard_triggers: Rc<RefCell<VecDeque<Option<SharedString>>>> = Rc::default();
         let content_props: Rc<RefCell<TriggerMenuContentProps>> = Rc::default();
         let popup = create_popup(
             &instance,
             CreatePopupOptions::new(trigger_menu_preset())
                 .rules(popup_rules(&editor_region, &content_props, cx))
-                .options(popup_options(&options, &open_trigger)),
+                .options(popup_options(&options, &open_trigger, &heard_triggers)),
             window,
             cx,
         );
@@ -464,6 +494,7 @@ impl TriggerMenu {
             announce_pending: AnnouncePending::new(),
             editor_region,
             open_trigger,
+            heard_triggers,
             content_props,
             item_props: RefCell::new(HashMap::new()),
             editor_id: RefCell::new(None),
@@ -479,7 +510,7 @@ impl TriggerMenu {
     /// (`sync`). A new `editor` is followed at once.
     pub fn set_options(&mut self, options: TriggerMenuOptions, window: &mut Window, cx: &mut Context<Self>) {
         let before = self.popup.is_open();
-        let mut changed = self.popup.set_options(popup_options(&options, &self.open_trigger), cx);
+        let mut changed = self.popup.set_options(popup_options(&options, &self.open_trigger, &self.heard_triggers), cx);
         // A controlled close clears the highlight in the same pass.
         if derive_open(options.open, before, |open| !open).unwrap_or(false) {
             changed |= self.listbox.set_highlighted(None);
@@ -620,8 +651,10 @@ impl TriggerMenu {
         if let Some(callback) = self.on_query_change.clone() {
             let source = change_source(reason, event.as_ref());
             let details = ChangeDetails::new(reason, source, event);
-            with_source(source, || {
-                callback(&query, &details, &trigger, argument.as_ref(), window, cx)
+            after_update(window, cx, move |window, cx| {
+                with_source(source, || {
+                    callback(&query, &details, &trigger, argument.as_ref(), window, cx)
+                });
             });
         }
     }

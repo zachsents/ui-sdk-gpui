@@ -67,7 +67,7 @@ cx.spawn(async move |_, _| println!("{:#}", query_result_value(&result.await)))
     .detach();
 ```
 
-`act` and `query` queue in call order. Dropping their task cancels the call. Synchronous changes reach component callbacks with `ChangeSource::Agent`. In async actions, retain `details.source` and wrap later mutations in `ui_sdk::kernel::with_source(source, || ..)` to preserve attribution. A callback can refuse a change with `details.cancel()`, a component's value in `on_before_value_change`.
+`act` and `query` queue in call order. Dropping their task cancels the call. Synchronous changes reach component callbacks with `ChangeSource::Agent`. In async actions, retain `details.source` and wrap later mutations in `ui_sdk::kernel::with_source(source, || ..)` to preserve attribution. An `on_before_*` callback can refuse a change with `details.cancel()`.
 
 ## Connect a Model
 

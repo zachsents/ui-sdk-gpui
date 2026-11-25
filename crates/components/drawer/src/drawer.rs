@@ -58,9 +58,11 @@ pub type DrawerDismissAttemptDetails = DialogDismissAttemptDetails;
 
 /// Hears the drawer move to another snap point: the snap point, and why:
 /// `Swipe`, `HandlePress`, `HandleKey`, `ContentResize`, `Back` or
-/// `Imperative` (`DrawerSnapPointChangeReason`). `details.cancel()` keeps it
-/// where it was. It runs inside the drawer's update, so it may update any
-/// entity but the drawer.
+/// `Imperative` (`DrawerSnapPointChangeReason`). As `on_snap_point_change`,
+/// it runs once the drawer's update is over, so it may update any entity,
+/// the drawer too; as `on_before_snap_point_change`, it runs inside the
+/// update, before the drawer moves, where `details.cancel()` keeps it where
+/// it was.
 pub type DrawerSnapPointChangeCallback = Rc<dyn Fn(&SnapPoint, &ChangeDetails, &mut Window, &mut App)>;
 
 /// How the drawer's sheet moves (`DrawerDriver`).
@@ -79,26 +81,36 @@ pub struct DrawerOptions<P> {
     pub open: Option<bool>,
     /// Whether it starts open, when uncontrolled.
     pub default_open: bool,
-    /// Runs when the drawer wants to open or close. `details.reason` says
-    /// why, `Swipe` included; `details.cancel()` stops it, and the return
-    /// value carries what closed it. It runs inside the drawer's update, so it
-    /// may update any entity but the drawer.
+    /// Runs when the drawer opens or closes. `details.reason` says why,
+    /// `Swipe` included, and the return value carries what closed it. It
+    /// runs once the drawer's update is over, so it may update any entity,
+    /// the drawer too.
     pub on_open_change: Option<DialogOpenChangeCallback>,
-    /// Runs once the drawer has finished opening or closing.
+    /// Runs as the drawer is asked to open or close, before it does, inside
+    /// the drawer's update: `details.cancel()` stops it. It hears the same
+    /// reasons and return value as `on_open_change`. It may update any
+    /// entity but the drawer.
+    pub on_before_open_change: Option<DialogOpenChangeCallback>,
+    /// Runs once the drawer has finished opening or closing, once the
+    /// drawer's update is over.
     pub on_open_change_complete: Option<OpenChangeCompleteCallback>,
     /// Runs when the payload the content shows changes: a trigger with
     /// another payload opens the drawer, or takes a non-modal drawer over
     /// while it's open, which fires no `on_open_change`, and so does
-    /// `open(payload)` on the open drawer. `details.cancel()` keeps the
-    /// previous payload.
+    /// `open(payload)` on the open drawer. It runs once the drawer's update
+    /// is over.
     pub on_payload_change: Option<ui_sdk_kernel::ChangeCallback<Option<P>>>,
+    /// Runs as the payload is asked to change, before it does, inside the
+    /// drawer's update: `details.cancel()` keeps the previous payload. It
+    /// may update any entity but the drawer.
+    pub on_before_payload_change: Option<ui_sdk_kernel::ChangeCallback<Option<P>>>,
     /// Whether Escape, an outside press, the back gesture and a swipe can
     /// close it. Close parts, triggers and the api always can. Defaults to
     /// true.
     pub dismissible: bool,
     /// Runs when a dismissal was refused because `dismissible` is false,
     /// including a swipe. The drawer resists and springs back. Ask "Discard
-    /// changes?" here.
+    /// changes?" here. It runs once the drawer's update is over.
     pub on_dismiss_attempt: Option<DismissAttemptCallback>,
     /// Regions that stay usable while the drawer blocks the window.
     pub persistent_elements: Option<PersistentElements>,
@@ -125,8 +137,13 @@ pub struct DrawerOptions<P> {
     /// The snap point it opens at, when uncontrolled. It opens there again
     /// each time. Defaults to the first of `snap_points`.
     pub default_snap_point: Option<SnapPoint>,
-    /// Runs when the drawer moves to another snap point.
+    /// Runs when the drawer moves to another snap point, once the drawer's
+    /// update is over.
     pub on_snap_point_change: Option<DrawerSnapPointChangeCallback>,
+    /// Runs as the drawer is asked to move to another snap point, before it
+    /// does, inside the drawer's update: `details.cancel()` keeps it where it
+    /// was. It may update any entity but the drawer.
+    pub on_before_snap_point_change: Option<DrawerSnapPointChangeCallback>,
     /// The edge it comes from. `Start` and `End` follow the writing
     /// direction. Defaults to `Bottom`.
     pub side: DrawerSide,
@@ -163,8 +180,10 @@ impl<P> Default for DrawerOptions<P> {
             open: None,
             default_open: false,
             on_open_change: None,
+            on_before_open_change: None,
             on_open_change_complete: None,
             on_payload_change: None,
+            on_before_payload_change: None,
             dismissible: true,
             on_dismiss_attempt: None,
             persistent_elements: None,
@@ -175,6 +194,7 @@ impl<P> Default for DrawerOptions<P> {
             snap_point: None,
             default_snap_point: None,
             on_snap_point_change: None,
+            on_before_snap_point_change: None,
             side: SheetSide::Bottom,
             modal_above: None,
             driver: SheetDriverName::Auto,
@@ -193,8 +213,10 @@ impl<P> Clone for DrawerOptions<P> {
             open: self.open,
             default_open: self.default_open,
             on_open_change: self.on_open_change.clone(),
+            on_before_open_change: self.on_before_open_change.clone(),
             on_open_change_complete: self.on_open_change_complete.clone(),
             on_payload_change: self.on_payload_change.clone(),
+            on_before_payload_change: self.on_before_payload_change.clone(),
             dismissible: self.dismissible,
             on_dismiss_attempt: self.on_dismiss_attempt.clone(),
             persistent_elements: self.persistent_elements.clone(),
@@ -205,6 +227,7 @@ impl<P> Clone for DrawerOptions<P> {
             snap_point: self.snap_point,
             default_snap_point: self.default_snap_point,
             on_snap_point_change: self.on_snap_point_change.clone(),
+            on_before_snap_point_change: self.on_before_snap_point_change.clone(),
             side: self.side,
             modal_above: self.modal_above,
             driver: self.driver,
@@ -244,6 +267,26 @@ impl<P> DrawerOptions<P> {
         self
     }
 
+    /// `on_before_open_change`, for a callback that doesn't read what
+    /// closes it.
+    pub fn on_before_open_change(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_open_change =
+            Some(Rc::new(move |open, details, _, window, cx| callback(open, details, window, cx)));
+        self
+    }
+
+    /// `on_before_open_change` with what closes it.
+    pub fn on_before_open_change_with_value(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, Option<&SharedString>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_open_change = Some(Rc::new(callback));
+        self
+    }
+
     pub fn on_open_change_complete(mut self, callback: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self {
         self.on_open_change_complete = Some(Rc::new(callback));
         self
@@ -254,6 +297,14 @@ impl<P> DrawerOptions<P> {
         callback: impl Fn(&Option<P>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_payload_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_payload_change(
+        mut self,
+        callback: impl Fn(&Option<P>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_payload_change = Some(Rc::new(callback));
         self
     }
 
@@ -317,6 +368,14 @@ impl<P> DrawerOptions<P> {
         callback: impl Fn(&SnapPoint, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_snap_point_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_snap_point_change(
+        mut self,
+        callback: impl Fn(&SnapPoint, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_snap_point_change = Some(Rc::new(callback));
         self
     }
 
@@ -387,8 +446,10 @@ impl<P> DrawerOptions<P> {
             open: self.open,
             default_open: self.default_open,
             on_open_change: self.on_open_change.clone(),
+            on_before_open_change: self.on_before_open_change.clone(),
             on_open_change_complete: self.on_open_change_complete.clone(),
             on_payload_change: self.on_payload_change.clone(),
+            on_before_payload_change: self.on_before_payload_change.clone(),
             dismissible: self.dismissible,
             on_dismiss_attempt: self.on_dismiss_attempt.clone(),
             ..PopupOptions::default()
@@ -702,6 +763,7 @@ impl<P: Clone + PartialEq + Debug + 'static> Drawer<P> {
         let mut snap_point = Controllable::new("snapPoint", initial);
         snap_point.set_controlled(options.snap_point);
         snap_point.set_on_change(snap_callback(options.on_snap_point_change.clone()));
+        snap_point.set_on_before_change(snap_callback(options.on_before_snap_point_change.clone()));
         let (popup, dialog_settings) = options.split();
         let DefinedDialog { instance, popup, dialog } = define_dialog(
             "drawer",
@@ -751,6 +813,8 @@ impl<P: Clone + PartialEq + Debug + 'static> Drawer<P> {
         self.instance.debug = options.debug;
         self.snap_point
             .set_on_change(snap_callback(options.on_snap_point_change.clone()));
+        self.snap_point
+            .set_on_before_change(snap_callback(options.on_before_snap_point_change.clone()));
         let settings = options.settings();
         let (popup, dialog_settings) = options.split();
         self.dialog.set_settings(dialog_settings);

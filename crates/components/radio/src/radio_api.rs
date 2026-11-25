@@ -104,7 +104,7 @@ impl RadioGroupApi {
             Some(value) => value.clone(),
             None => options.default_value.clone().flatten(),
         };
-        let mut value = Controllable::new("value", first.clone()).after_update();
+        let mut value = Controllable::new("value", first.clone());
         value.set_controlled(options.value.clone());
         value.set_on_change(options.on_value_change.clone());
         value.set_on_before_change(options.on_before_value_change.clone());

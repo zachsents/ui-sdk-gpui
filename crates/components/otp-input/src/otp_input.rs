@@ -134,7 +134,7 @@ impl OtpInput {
             &base.pattern,
             base.max_length,
         );
-        let mut value = Controllable::new("value", first).after_update();
+        let mut value = Controllable::new("value", first);
         value.set_controlled(
             options
                 .value

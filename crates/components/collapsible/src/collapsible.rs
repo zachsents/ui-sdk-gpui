@@ -19,7 +19,7 @@ use ui_sdk_kernel::part::FocusMode;
 use ui_sdk_kernel::roles::Role;
 use ui_sdk_kernel::{
     Agent, AgentAction, AgentState, Aria, ChangeCallback, ChangeDetails, ChangeOptions,
-    Controllable, Instance, Part, Reason, held,
+    Controllable, Instance, Part, Reason, after_update, held,
 };
 use ui_sdk_motion::PresenceTiming;
 
@@ -42,13 +42,17 @@ pub struct CollapsibleOptions {
     pub open: Option<bool>,
     /// Whether the panel is open at first, when uncontrolled.
     pub default_open: bool,
-    /// Runs when the panel wants to open or close. `details.reason` is
-    /// `TriggerPress`, `FindInPage` or `Imperative`, and `details.cancel()`
-    /// stops it. It runs inside the collapsible's update, so it may update
-    /// any entity but the collapsible.
+    /// Runs when the panel opens or closes. `details.reason` is
+    /// `TriggerPress`, `FindInPage` or `Imperative`. It runs once the
+    /// collapsible's update is over, so it may update any entity, the
+    /// collapsible too.
     pub on_open_change: Option<ChangeCallback<bool>>,
+    /// Runs as the panel is asked to open or close, before it does, inside
+    /// the collapsible's update: `details.cancel()` stops it. It may update
+    /// any entity but the collapsible.
+    pub on_before_open_change: Option<ChangeCallback<bool>>,
     /// Runs once the panel has finished opening or closing, after any
-    /// animation.
+    /// animation, once the collapsible's update is over.
     pub on_open_change_complete: Option<OpenChangeCompleteCallback>,
     /// Stops the trigger from opening or closing the panel. The trigger stays
     /// focusable.
@@ -76,6 +80,14 @@ impl CollapsibleOptions {
         callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_open_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_open_change(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_open_change = Some(Rc::new(callback));
         self
     }
 
@@ -179,6 +191,7 @@ impl Collapsible {
         let mut open = Controllable::new("open", options.default_open);
         open.set_controlled(options.open);
         open.set_on_change(options.on_open_change.clone());
+        open.set_on_before_change(options.on_before_open_change.clone());
         let mut instance = Instance::new("collapsible").with_agent(cx);
         instance.debug = options.debug;
         let previous = *open.get();
@@ -205,6 +218,7 @@ impl Collapsible {
     pub fn set_options(&mut self, options: CollapsibleOptions, window: &mut Window, cx: &mut Context<Self>) {
         let mut changed = self.open.set_controlled(options.open);
         self.open.set_on_change(options.on_open_change);
+        self.open.set_on_before_change(options.on_before_open_change);
         self.on_open_change_complete = options.on_open_change_complete;
         changed |= self.disabled != options.disabled;
         self.disabled = options.disabled;
@@ -330,7 +344,7 @@ impl Collapsible {
     fn settled(&mut self, open: bool, window: &mut Window, cx: &mut Context<Self>) {
         self.opened_by = None;
         if let Some(callback) = self.on_open_change_complete.clone() {
-            callback(open, window, cx);
+            after_update(window, cx, move |window, cx| callback(open, window, cx));
         }
     }
 

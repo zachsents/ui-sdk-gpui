@@ -107,21 +107,28 @@ pub struct PopoverOptions<P: Clone + PartialEq + Debug + 'static = ()> {
     pub open: Option<bool>,
     /// Whether the popover starts open, when uncontrolled. Defaults to false.
     pub default_open: bool,
-    /// Runs when the popover wants to open or close, with what closed it,
-    /// like a Close part's value. `details.reason` says why (see
-    /// [`PopoverOpenChangeReason`]), and `details.cancel()` stops it. It runs
-    /// inside the popover's update, so it may update any entity but the
-    /// popover.
+    /// Runs when the popover opens or closes, with what closed it, like a
+    /// Close part's value. `details.reason` says why (see
+    /// [`PopoverOpenChangeReason`]). It runs once the popover's update is
+    /// over, so it may update any entity, the popover too.
     pub on_open_change: Option<PopupOpenChangeCallback>,
+    /// Runs as the popover is asked to open or close, before it does, inside
+    /// the popover's update: `details.cancel()` stops it. It may update any
+    /// entity but the popover.
+    pub on_before_open_change: Option<PopupOpenChangeCallback>,
     /// Runs once the popover has finished opening or closing, after any
-    /// animation.
+    /// animation, once the popover's update is over.
     pub on_open_change_complete: Option<OpenChangeCompleteCallback>,
     /// Runs when the payload the content shows changes: a trigger with
     /// another payload opens the popover, or takes the open popover over,
     /// which fires no `on_open_change`, and so does a controller's
-    /// `open(payload)` on the open popover. `details.cancel()` keeps the
-    /// previous payload.
+    /// `open(payload)` on the open popover. It runs once the popover's update
+    /// is over.
     pub on_payload_change: Option<ChangeCallback<Option<P>>>,
+    /// Runs as the payload is asked to change, before it does, inside the
+    /// popover's update: `details.cancel()` keeps the previous payload. It
+    /// may update any entity but the popover.
+    pub on_before_payload_change: Option<ChangeCallback<Option<P>>>,
     /// `False`: the rest of the window stays usable, and focus leaving the
     /// popover closes it. `True`: also traps focus, blocks the rest of the
     /// window and its scrolling, and an outside press only closes the
@@ -152,7 +159,7 @@ pub struct PopoverOptions<P: Clone + PartialEq + Debug + 'static = ()> {
     /// controller always can. Defaults to true.
     pub dismissible: bool,
     /// Runs when `dismissible` refused a dismissal made on purpose (see
-    /// [`PopoverDismissReason`]).
+    /// [`PopoverDismissReason`]), once the popover's update is over.
     pub on_dismiss_attempt: Option<DismissAttemptCallback>,
     /// Logs every change with its reason, in development builds.
     pub debug: bool,
@@ -164,8 +171,10 @@ impl<P: Clone + PartialEq + Debug + 'static> Default for PopoverOptions<P> {
             open: None,
             default_open: false,
             on_open_change: None,
+            on_before_open_change: None,
             on_open_change_complete: None,
             on_payload_change: None,
+            on_before_payload_change: None,
             modal: None,
             open_on_hover: false,
             delay: None,
@@ -185,8 +194,10 @@ impl<P: Clone + PartialEq + Debug + 'static> Clone for PopoverOptions<P> {
             open: self.open,
             default_open: self.default_open,
             on_open_change: self.on_open_change.clone(),
+            on_before_open_change: self.on_before_open_change.clone(),
             on_open_change_complete: self.on_open_change_complete.clone(),
             on_payload_change: self.on_payload_change.clone(),
+            on_before_payload_change: self.on_before_payload_change.clone(),
             modal: self.modal,
             open_on_hover: self.open_on_hover,
             delay: self.delay,
@@ -231,6 +242,28 @@ impl<P: Clone + PartialEq + Debug + 'static> PopoverOptions<P> {
         self
     }
 
+    /// `on_before_open_change`, for a callback that doesn't read what
+    /// closes it.
+    pub fn on_before_open_change(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_open_change = Some(Rc::new(move |open, details, _, window, cx| {
+            callback(open, details, window, cx)
+        }));
+        self
+    }
+
+    /// `on_before_open_change` with what closes it, like a Close part's
+    /// value.
+    pub fn on_before_open_change_with_value(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, Option<&SharedString>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_open_change = Some(Rc::new(callback));
+        self
+    }
+
     pub fn on_open_change_complete(
         mut self,
         callback: impl Fn(bool, &mut Window, &mut App) + 'static,
@@ -244,6 +277,14 @@ impl<P: Clone + PartialEq + Debug + 'static> PopoverOptions<P> {
         callback: impl Fn(&Option<P>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_payload_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_payload_change(
+        mut self,
+        callback: impl Fn(&Option<P>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_payload_change = Some(Rc::new(callback));
         self
     }
 
@@ -301,8 +342,10 @@ impl<P: Clone + PartialEq + Debug + 'static> PopoverOptions<P> {
             open: self.open,
             default_open: self.default_open,
             on_open_change: self.on_open_change.clone(),
+            on_before_open_change: self.on_before_open_change.clone(),
             on_open_change_complete: self.on_open_change_complete.clone(),
             on_payload_change: self.on_payload_change.clone(),
+            on_before_payload_change: self.on_before_payload_change.clone(),
             modal: self.modal.map(Modal::from),
             presentation: Some(self.presentation),
             open_on_hover: self.open_on_hover,

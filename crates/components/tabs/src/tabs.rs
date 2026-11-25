@@ -370,7 +370,7 @@ pub struct Tabs {
 
 impl Tabs {
     pub fn new(options: TabsOptions, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let mut value = Controllable::new("value", options.default_value.clone()).after_update();
+        let mut value = Controllable::new("value", options.default_value.clone());
         value.set_controlled(options.value.clone());
         value.set_on_change(options.on_value_change.clone());
         value.set_on_before_change(options.on_before_value_change.clone());

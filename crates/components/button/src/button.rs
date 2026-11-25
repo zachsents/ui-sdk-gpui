@@ -27,8 +27,9 @@ use ui_sdk_platform::{
 pub type ButtonActionDetails = ActionDetails;
 
 /// What a press runs: the event behind it, when there is one, and how the
-/// button was pressed. It runs inside the button's update, so it may update
-/// any entity but the button. Return [`ActionOutcome::wait`] with work that
+/// button was pressed. It runs inside the button's update, unlike the
+/// components' `on_*` callbacks, since the button reads what it returns, so
+/// it may update any entity but the button. Return [`ActionOutcome::wait`] with work that
 /// goes on to keep the button pending until it settles, and
 /// [`ActionOutcome::Canceled`] to stop what the press would do next, like
 /// submitting the form.

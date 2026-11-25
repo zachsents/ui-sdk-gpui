@@ -249,7 +249,7 @@ impl DateInputCore {
             .clone()
             .or_else(|| options.default_value.clone())
             .flatten();
-        let mut value = Controllable::new("value", value_for(kind, &options, first.as_ref())).after_update();
+        let mut value = Controllable::new("value", value_for(kind, &options, first.as_ref()));
         value.set_controlled(
             options
                 .value

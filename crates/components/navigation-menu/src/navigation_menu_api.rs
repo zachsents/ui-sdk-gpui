@@ -21,8 +21,8 @@ use ui_sdk_focus::{Orientation, orientation_of};
 use ui_sdk_kernel::focus_events::on_focus_out;
 use ui_sdk_kernel::modality::{restore_focus, window_source};
 use ui_sdk_kernel::{
-    ChangeOptions, Controllable, InputEvent, Instance, Part, Parts, Reason, flag_while_bound, held,
-    key_while_bound,
+    ChangeOptions, Controllable, InputEvent, Instance, Part, Parts, Reason, after_update,
+    flag_while_bound, held, key_while_bound,
 };
 use ui_sdk_motion::{Presence, PresenceState, PresenceTiming};
 use ui_sdk_platform::{
@@ -284,7 +284,7 @@ pub struct NavigationMenu {
 
 impl NavigationMenu {
     pub fn new(options: NavigationMenuOptions, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let mut value = Controllable::new("value", options.default_value.clone()).after_update();
+        let mut value = Controllable::new("value", options.default_value.clone());
         value.set_controlled(options.value.clone());
         value.set_on_change(options.on_value_change.clone());
         value.set_on_before_change(options.on_before_value_change.clone());
@@ -1206,7 +1206,7 @@ impl NavigationMenu {
             self.opened_since_close = false;
         }
         if let Some(callback) = self.on_open_change_complete.clone() {
-            callback(open, window, cx);
+            after_update(window, cx, move |window, cx| callback(open, window, cx));
         }
     }
 

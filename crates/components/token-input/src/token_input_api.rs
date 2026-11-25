@@ -9,8 +9,8 @@ use std::time::Duration;
 use gpui::{App, Context, FocusHandle, SharedString, Subscription, WeakEntity, Window};
 use ui_sdk_forms::{ValueInputOptions, ValueMissingKind, bind_value_input, keeps_value_on_reset};
 use ui_sdk_kernel::{
-    ChangeCallback, ChangeDetails, ChangeOptions, ChangeSource, InputEvent, Reason, resolve_source,
-    with_source,
+    ChangeCallback, ChangeDetails, ChangeOptions, ChangeSource, InputEvent, Reason, after_update,
+    resolve_source, with_source,
 };
 use ui_sdk_text::{
     EditorChange, EditorContent, EditorListener, EditorReplaceOptions, PendingToken, TextBefore,
@@ -914,7 +914,9 @@ impl TokenInput {
     pub(crate) fn submit(&mut self, event: Option<InputEvent>, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(on_submit) = self.on_submit.clone() {
             let value = self.value.get().clone();
-            on_submit(&value, &TokenInputSubmitDetails { event }, window, cx);
+            after_update(window, cx, move |window, cx| {
+                on_submit(&value, &TokenInputSubmitDetails { event }, window, cx)
+            });
             return;
         }
         if let Some(form) = self.internals.form() {

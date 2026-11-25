@@ -111,7 +111,7 @@ fn main() {
 
 - The switch is an entity, made once from its options, and keeps its own state from `default_checked` on.
 - `Switch::root` and `Switch::thumb` are its parts: divs with the role, focus and key handling already on them. `with` styles a part from its state.
-- `on_checked_change` hears each change, with why (`details.reason`), how (`details.source`, like mouse or keyboard), and `details.cancel()` to refuse it.
+- `on_checked_change` hears each change once it's made, with why (`details.reason`) and how (`details.source`, like mouse or keyboard). `on_before_checked_change` hears it before, and `details.cancel()` there refuses it.
 - The label points at the switch through `for_id`, so a press on it toggles the switch, and its `text` is the switch's name. gpui can't read back the text an element draws, so the name is given apart from the `"Wi-Fi"` it draws.
 - `ui_sdk::init` binds Tab to move focus and names the directory saved state goes in. `live_regions` is where a window's screen reader announcements go.
 

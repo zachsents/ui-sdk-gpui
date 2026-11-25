@@ -45,12 +45,15 @@ pub struct PreferenceOptions<V> {
     /// Where the value is kept between runs, from `create_local_storage` or
     /// `create_session_storage`.
     pub storage: Option<ValueStorage>,
-    /// Called before the value changes, with its reason: `Imperative`, or the
+    /// Called when the value changes, with its reason: `Imperative`, or the
     /// one `set` was given, and `StorageSync` when a value saved under the
-    /// same storage arrives. `details.cancel()` keeps the current one. It
-    /// runs inside the preference's update, so it may update any entity but
-    /// the preference.
+    /// same storage arrives. It runs once the preference's update is over, so
+    /// it may update any entity, the preference too.
     pub on_value_change: Option<ChangeCallback<V>>,
+    /// Called before the value changes, with its reason, inside the
+    /// preference's update: `details.cancel()` keeps the current one. It may
+    /// update any entity but the preference.
+    pub on_before_value_change: Option<ChangeCallback<V>>,
 }
 
 impl<V: PreferenceValue> PreferenceOptions<V> {
@@ -61,6 +64,7 @@ impl<V: PreferenceValue> PreferenceOptions<V> {
             value: None,
             storage: None,
             on_value_change: None,
+            on_before_value_change: None,
         }
     }
 
@@ -89,6 +93,14 @@ impl<V: PreferenceValue> PreferenceOptions<V> {
         callback: impl Fn(&V, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&V, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 }
@@ -167,6 +179,7 @@ impl<V: PreferenceValue> Preference<V> {
             value,
             storage,
             on_value_change,
+            on_before_value_change,
         } = options;
         assert!(
             values.contains(&default_value),
@@ -178,6 +191,7 @@ impl<V: PreferenceValue> Preference<V> {
         let mut controllable = Controllable::new("value", start);
         controllable.set_controlled(value);
         controllable.set_on_change(on_value_change);
+        controllable.set_on_before_change(on_before_value_change);
         let subscription = storage.as_ref().map(|storage| {
             let this = cx.weak_entity();
             storage.subscribe(cx, move |saved, cx| {
@@ -221,7 +235,8 @@ impl<V: PreferenceValue> Preference<V> {
         }
     }
 
-    /// Changes the value, through `on_value_change`, which can cancel it, and
+    /// Changes the value, through `on_before_value_change`, which can cancel
+    /// it, and `on_value_change`, and
     /// saves it. The reason defaults to `Imperative`. Returns whether it
     /// changed, or for a controlled value, whether the change was accepted.
     pub fn set(
@@ -304,7 +319,7 @@ impl<V: PreferenceValue> Preference<V> {
         let ran = in_window(entity, cx, |window, cx| {
             self.change(next.clone(), options, window, cx);
         });
-        // With no window open to run `on_value_change` in, the value follows.
+        // With no window open to run the callbacks in, the value follows.
         if ran.is_none() && self.value.set_held(next.clone()) {
             change::log(&self.instance, "value", &next, Reason::StorageSync);
         }

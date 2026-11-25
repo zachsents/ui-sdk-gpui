@@ -78,8 +78,8 @@ pub type ItemToLabelFn<T> = Rc<dyn Fn(&T) -> SharedString>;
 pub type ItemEqualFn<T> = Rc<dyn Fn(&T, &T) -> bool>;
 
 /// `on_highlight`: the value the highlight moved to, or `None`, and where it
-/// is. It runs inside the select's update, so it may update any entity but
-/// the select.
+/// is. It runs once the select's update is over, so it may update any
+/// entity, the select too.
 pub type HighlightCallback<T> = Rc<dyn Fn(Option<&T>, &ListHighlightDetails, &mut Window, &mut App)>;
 
 /// The options `Select` takes (`SelectOptions`).
@@ -103,12 +103,16 @@ pub struct SelectOptions<T> {
     pub open: Option<bool>,
     /// Whether the list starts open, when uncontrolled.
     pub default_open: bool,
-    /// Runs when the list wants to open or close. `details.reason` is one of
-    /// [`SelectOpenChangeReason`]'s, and `details.cancel()` stops it. It runs
-    /// inside the select's update.
+    /// Runs when the list opens or closes. `details.reason` is one of
+    /// [`SelectOpenChangeReason`]'s. It runs once the select's update is
+    /// over, so it may update any entity, the select too.
     pub on_open_change: Option<ChangeCallback<bool>>,
+    /// Runs as the list is asked to open or close, before it does, inside
+    /// the select's update: `details.cancel()` stops it. It may update any
+    /// entity but the select.
+    pub on_before_open_change: Option<ChangeCallback<bool>>,
     /// Runs once the list has finished opening or closing, after any
-    /// animation.
+    /// animation, once the select's update is over.
     pub on_open_change_complete: Option<OpenChangeCompleteCallback>,
     /// Whether several items can be selected. The value is then a list, and
     /// the list stays open as items toggle.
@@ -128,7 +132,8 @@ pub struct SelectOptions<T> {
     pub default_query: SharedString,
     /// Runs when the search field's text wants to change: typing, or closing
     /// the list, which empties it. `details.reason` is one of
-    /// [`SelectQueryChangeReason`]'s. It runs inside the select's update.
+    /// [`SelectQueryChangeReason`]'s. It runs once the select's update is
+    /// over, so it may update any entity, the select too.
     pub on_query_change: Option<ChangeCallback<SharedString>>,
     /// How an input part narrows the list: `Contains`, `StartsWith`, a
     /// function of the item and the text, whose score also sorts data
@@ -140,7 +145,7 @@ pub struct SelectOptions<T> {
     pub status: AsyncOptionsStatus,
     /// Runs when the highlight or scrolling reaches the last item, so the
     /// next page can load. Not again for the same items, unless the last
-    /// load failed.
+    /// load failed. It runs once the select's update is over.
     pub on_load_more: Option<LoadMoreFn>,
     /// What screen readers hear after typing pauses in the search field,
     /// when no status part is rendered. `None` from it says nothing. Defaults
@@ -158,7 +163,8 @@ pub struct SelectOptions<T> {
     /// equal but stand for the same item.
     pub is_item_equal_to_value: Option<ItemEqualFn<T>>,
     /// Runs when the highlight moves, with the item's index among the
-    /// visible items, so a virtualized list can scroll to it.
+    /// visible items, so a virtualized list can scroll to it. It runs once
+    /// the select's update is over.
     pub on_highlight: Option<HighlightCallback<T>>,
     /// Whether arrow keys wrap from the last item to the first. Defaults to
     /// true.
@@ -197,7 +203,8 @@ pub struct SelectOptions<T> {
     /// back gesture and a sheet's swipe can close the list. Defaults to true.
     pub dismissible: bool,
     /// Runs when `dismissible` refused a dismissal made on purpose:
-    /// `details.reason` is one of [`SelectDismissReason`]'s.
+    /// `details.reason` is one of [`SelectDismissReason`]'s. It runs once
+    /// the select's update is over.
     pub on_dismiss_attempt: Option<DismissAttemptCallback>,
     /// The search field's own options, what the original's input element
     /// takes as attributes, like its placeholder and its look. Its typing is
@@ -217,6 +224,7 @@ impl<T> Default for SelectOptions<T> {
             open: None,
             default_open: false,
             on_open_change: None,
+            on_before_open_change: None,
             on_open_change_complete: None,
             multiple: false,
             items: None,
@@ -261,6 +269,7 @@ impl<T: Clone> Clone for SelectOptions<T> {
             open: self.open,
             default_open: self.default_open,
             on_open_change: self.on_open_change.clone(),
+            on_before_open_change: self.on_before_open_change.clone(),
             on_open_change_complete: self.on_open_change_complete.clone(),
             multiple: self.multiple,
             items: self.items.clone(),
@@ -337,6 +346,14 @@ impl<T> SelectOptions<T> {
         callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_open_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_open_change(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_open_change = Some(Rc::new(callback));
         self
     }
 

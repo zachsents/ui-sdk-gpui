@@ -63,14 +63,18 @@ pub struct CarouselOptions {
     pub page: Option<usize>,
     /// The page it starts on, from 1, when uncontrolled. 1 by default.
     pub default_page: Option<usize>,
-    /// Runs when the page wants to change. `details.reason` says why, and
-    /// `details.cancel()` stays on the page: a swipe or drag springs back. It
-    /// runs inside the carousel's update, so it may update any entity but
-    /// the carousel.
+    /// Runs when the page changes. `details.reason` says why. It runs once the
+    /// carousel's update is over, so it may update any entity, the carousel
+    /// too.
     pub on_page_change: Option<ChangeCallback<usize>>,
+    /// Runs as the page is asked to change, before it does, inside the
+    /// carousel's update: `details.cancel()` stays on the page, and a swipe or
+    /// drag springs back. It may update any entity but the carousel.
+    pub on_before_page_change: Option<ChangeCallback<usize>>,
     /// Runs once the slides come to rest on a page, after a spring, a drag
     /// or a scroll, with that page. Start work there that would stutter the
-    /// motion.
+    /// motion. It runs once the carousel's update is over, so it may update
+    /// any entity, the carousel too.
     pub on_page_change_complete: Option<PageCompleteCallback>,
     /// Whether it rotates through the pages on its own. Pass it to control
     /// rotation.
@@ -78,11 +82,15 @@ pub struct CarouselOptions {
     /// Whether it starts rotating, when uncontrolled. It doesn't when the
     /// user prefers reduced motion; the play toggle still starts it.
     pub default_playing: bool,
-    /// Runs when rotation wants to start or stop. Keyboard focus moving in
-    /// and the user paging stop it, as the carousel pattern asks.
-    /// `details.cancel()` keeps it as it is. It runs inside the carousel's
-    /// update, so it may update any entity but the carousel.
+    /// Runs when rotation starts or stops. Keyboard focus moving in and the
+    /// user paging stop it, as the carousel pattern asks. It runs once the
+    /// carousel's update is over, so it may update any entity, the carousel
+    /// too.
     pub on_playing_change: Option<ChangeCallback<bool>>,
+    /// Runs as rotation is asked to start or stop, before it does, inside the
+    /// carousel's update: `details.cancel()` keeps it as it is. It may update
+    /// any entity but the carousel.
+    pub on_before_playing_change: Option<ChangeCallback<bool>>,
     /// How long each page shows while rotating. Hovering, a hidden window and
     /// scrolling the carousel out of view pause it. 5 seconds by default.
     pub interval: Option<Duration>,
@@ -130,6 +138,14 @@ impl CarouselOptions {
         self
     }
 
+    pub fn on_before_page_change(
+        mut self,
+        callback: impl Fn(&usize, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_page_change = Some(Rc::new(callback));
+        self
+    }
+
     pub fn on_page_change_complete(mut self, callback: impl Fn(usize, &mut Window, &mut App) + 'static) -> Self {
         self.on_page_change_complete = Some(Rc::new(callback));
         self
@@ -150,6 +166,14 @@ impl CarouselOptions {
         callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_playing_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_playing_change(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_playing_change = Some(Rc::new(callback));
         self
     }
 
@@ -393,9 +417,11 @@ impl Carousel {
         let mut page = Controllable::new("page", options.default_page.unwrap_or(1).max(1));
         page.set_controlled(options.page);
         page.set_on_change(options.on_page_change.clone());
+        page.set_on_before_change(options.on_before_page_change.clone());
         let mut playing = Controllable::new("playing", options.default_playing);
         playing.set_controlled(options.playing);
         playing.set_on_change(options.on_playing_change.clone());
+        playing.set_on_before_change(options.on_before_playing_change.clone());
         let mut instance = Instance::new("carousel").with_agent(cx);
         instance.debug = options.debug;
         // The root and the viewport leaving the page stop what they started.
@@ -486,7 +512,9 @@ impl Carousel {
         let mut changed = self.page.set_controlled(options.page);
         changed |= self.playing.set_controlled(options.playing);
         self.page.set_on_change(options.on_page_change);
+        self.page.set_on_before_change(options.on_before_page_change);
         self.playing.set_on_change(options.on_playing_change);
+        self.playing.set_on_before_change(options.on_before_playing_change);
         self.on_page_change_complete = options.on_page_change_complete;
         let orientation = options.orientation.unwrap_or(Orientation::Horizontal);
         let align = options.align.unwrap_or_default();

@@ -36,11 +36,14 @@ pub struct ToggleOptions {
     /// Whether it's checked at first, when uncontrolled. A form reset returns
     /// to it.
     pub default_checked: Option<CheckedState>,
-    /// Runs when a user or a form reset wants to change it. `details.reason`
-    /// says why (`Press`, `Reset`, `Imperative`), and `details.cancel()` stops
-    /// it. It runs inside the component's update, so it may update any entity
-    /// but the component.
+    /// Runs when a user or a form reset changes it. `details.reason` says why
+    /// (`Press`, `Reset`, `Imperative`). It runs once the component's update
+    /// is over, so it may update any entity, the component too.
     pub on_checked_change: Option<ChangeCallback<CheckedState>>,
+    /// Runs as it is asked to change, before it does, inside the component's
+    /// update: `details.cancel()` stops it. It may update any entity but the
+    /// component.
+    pub on_before_checked_change: Option<ChangeCallback<CheckedState>>,
     /// Disables it like a native control: it can't be focused or changed, and
     /// isn't submitted.
     pub disabled: bool,
@@ -73,6 +76,14 @@ impl ToggleOptions {
         callback: impl Fn(&CheckedState, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_checked_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_checked_change(
+        mut self,
+        callback: impl Fn(&CheckedState, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_checked_change = Some(Rc::new(callback));
         self
     }
 
@@ -196,6 +207,7 @@ impl ToggleControl {
         let mut checked = Controllable::new("checked", first);
         checked.set_controlled(options.checked);
         checked.set_on_change(options.on_checked_change.clone());
+        checked.set_on_before_change(options.on_before_checked_change.clone());
         let internals = ElementInternals::new(cx);
         let focus_handle = cx.focus_handle();
         internals.set_focus_handle(Some(focus_handle.clone()));
@@ -236,6 +248,7 @@ impl ToggleControl {
     pub fn set_options(&mut self, options: ToggleOptions) -> bool {
         let mut changed = self.checked.set_controlled(options.checked);
         self.checked.set_on_change(options.on_checked_change);
+        self.checked.set_on_before_change(options.on_before_checked_change);
         // Like the native `defaultChecked`, changing it changes what a reset
         // returns to.
         if let Some(default) = options.default_checked {

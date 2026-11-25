@@ -440,13 +440,16 @@ impl fmt::Debug for TriggerMenuSelectDetails {
 /// Runs when an item, with every required argument, is chosen, with its
 /// value and the details. Return a future and a token is inserted at once as
 /// pending, updated with what it resolves to and removed if it fails; the
-/// menu closes either way. It runs inside the menu's update, so it may
-/// update any entity but the menu.
+/// menu closes either way. It runs inside the menu's update, since the menu
+/// reads what it returns and `details.prevent_default()`, so it may update
+/// any entity but the menu.
 pub type TriggerMenuSelectCallback =
     Rc<dyn Fn(&SharedString, &TriggerMenuSelectDetails, &mut Window, &mut App) -> Option<PendingToken>>;
 
-/// Runs when the menu wants to open or close, with the trigger of the match,
-/// like `"@"`. `details.reason` says why, and `details.cancel()` stops it.
+/// Hears the menu open or close, with the trigger of the match, like `"@"`.
+/// `details.reason` says why. As `on_open_change`, it runs once the menu's
+/// update is over; as `on_before_open_change`, inside it, before the menu
+/// opens or closes, where `details.cancel()` stops it.
 pub type TriggerMenuOpenChangeCallback =
     Rc<dyn Fn(&bool, &ChangeDetails, Option<&SharedString>, &mut Window, &mut App)>;
 
@@ -478,23 +481,31 @@ pub struct TriggerMenuOptions {
     /// Whether the menu is open. Pass it to control it; it shows only while
     /// there's a match.
     pub open: Option<bool>,
-    /// Runs when the menu wants to open or close, with the trigger.
-    /// `details.reason` is one of [`TriggerMenuOpenChangeReason`]'s, and
-    /// `details.cancel()` stops it. It runs inside the menu's update, so it
-    /// may update any entity but the menu.
+    /// Runs when the menu opens or closes, with the trigger.
+    /// `details.reason` is one of [`TriggerMenuOpenChangeReason`]'s. It runs
+    /// once the menu's update is over, so it may update any entity, the menu
+    /// too.
     pub on_open_change: Option<TriggerMenuOpenChangeCallback>,
+    /// Runs as the menu is asked to open or close, with the trigger, before
+    /// it does, inside the menu's update: `details.cancel()` stops it. It may
+    /// update any entity but the menu.
+    pub on_before_open_change: Option<TriggerMenuOpenChangeCallback>,
     /// Runs once the menu has finished opening or closing, after any
-    /// animation.
+    /// animation, once the menu's update is over.
     pub on_open_change_complete: Option<TriggerMenuOpenChangeCompleteCallback>,
     /// Runs when the text after the trigger changes, with the trigger and the
     /// argument being typed. Read-only: it's the editor's text.
-    /// `details.reason` is `InputChange`, `ItemPress` or `Imperative`.
+    /// `details.reason` is `InputChange`, `ItemPress` or `Imperative`. It
+    /// runs once the menu's update is over, so it may update any entity, the
+    /// menu too.
     pub on_query_change: Option<TriggerMenuQueryChangeCallback>,
     /// Runs when an item, with every required argument, is chosen. The
     /// default insertion follows unless `details.prevent_default()`. Return
     /// a future and a token is inserted at once as pending, updated with
     /// what it resolves to and removed if it fails; the menu closes either
-    /// way.
+    /// way. It runs inside the menu's update, since the menu reads what it
+    /// returns and `details.prevent_default()`, so it may update any entity
+    /// but the menu.
     pub on_select: Option<TriggerMenuSelectCallback>,
     /// What screen readers hear once an `on_select` future has been pending
     /// for a second, so a slow action doesn't pass in silence. Set it in the
@@ -516,7 +527,8 @@ pub struct TriggerMenuOptions {
     /// Whether Escape and an outside press can close it. Defaults to true.
     pub dismissible: bool,
     /// Runs when `dismissible` refused a dismissal made on purpose, with
-    /// [`TriggerMenuDismissReason`]'s reasons.
+    /// [`TriggerMenuDismissReason`]'s reasons, once the menu's update is
+    /// over.
     pub on_dismiss_attempt: Option<DismissAttemptCallback>,
     /// Logs every change with its reason, in development builds.
     pub debug: bool,
@@ -529,6 +541,7 @@ impl Default for TriggerMenuOptions {
             editor: None,
             open: None,
             on_open_change: None,
+            on_before_open_change: None,
             on_open_change_complete: None,
             on_query_change: None,
             on_select: None,
@@ -551,6 +564,7 @@ impl Clone for TriggerMenuOptions {
             editor: self.editor.clone(),
             open: self.open,
             on_open_change: self.on_open_change.clone(),
+            on_before_open_change: self.on_before_open_change.clone(),
             on_open_change_complete: self.on_open_change_complete.clone(),
             on_query_change: self.on_query_change.clone(),
             on_select: self.on_select.clone(),
@@ -587,6 +601,14 @@ impl TriggerMenuOptions {
         callback: impl Fn(&bool, &ChangeDetails, Option<&SharedString>, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_open_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_open_change(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, Option<&SharedString>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_open_change = Some(Rc::new(callback));
         self
     }
 
@@ -763,7 +785,8 @@ pub struct TriggerMenuItemProps {
     /// listbox pattern asks.
     pub disabled: bool,
     /// Runs before the menu's `on_select`. `details.prevent_default()` skips
-    /// the default insertion.
+    /// the default insertion. It runs inside the menu's update, as the
+    /// menu's does.
     pub on_select: Option<TriggerMenuSelectCallback>,
     /// The key of the group it's in, which the app passes from the group
     /// around it.

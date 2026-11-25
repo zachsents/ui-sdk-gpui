@@ -12,7 +12,7 @@ use gpui::{App, Bounds, Context, FocusHandle, KeyDownEvent, Pixels, ScrollHandle
 use ui_sdk_focus::{RovingFocus, RovingFocusOptions, RovingMember};
 use ui_sdk_kernel::roles::Role;
 use ui_sdk_kernel::{
-    ChangeOptions, Controllable, InputEvent, Instance, Key, Parts, Reason, dev, name_of,
+    ChangeOptions, Controllable, InputEvent, Instance, Key, Parts, Reason, after_update, dev, name_of,
 };
 use ui_sdk_lists::{ListHighlightDetails, TreeCollection, TreePosition, create_tree_collection, tree_data_nodes};
 use ui_sdk_number::{NumberFormat, clamp};
@@ -87,7 +87,7 @@ impl Waterfall {
         let mut value = Controllable::new(
             "value",
             options.value.clone().unwrap_or_else(|| options.default_value.clone()),
-        ).after_update();
+        );
         value.set_controlled(options.value.clone());
         value.set_on_change(options.on_value_change.clone());
         value.set_on_before_change(options.on_before_value_change.clone());
@@ -97,6 +97,7 @@ impl Waterfall {
         );
         expanded.set_controlled(options.expanded.clone());
         expanded.set_on_change(options.on_expanded_change.clone());
+        expanded.set_on_before_change(options.on_before_expanded_change.clone());
         let mut instance = Instance::new("waterfall").with_agent(cx);
         instance.debug = options.debug;
         let landed = cx.weak_entity();
@@ -144,6 +145,7 @@ impl Waterfall {
         self.value.set_on_before_change(options.on_before_value_change);
         changed |= self.expanded.set_controlled(options.expanded);
         self.expanded.set_on_change(options.on_expanded_change);
+        self.expanded.set_on_before_change(options.on_before_expanded_change);
         if !Rc::ptr_eq(&self.items, &options.items) {
             self.known = known(&options.items);
             self.items = options.items;
@@ -454,8 +456,11 @@ impl Waterfall {
     }
 
     fn highlight(&self, key: &SharedString, index: Option<usize>, event: Option<InputEvent>, window: &mut Window, cx: &mut App) {
-        if let Some(on_highlight) = &self.on_highlight {
-            on_highlight(key, &ListHighlightDetails { index, event }, window, cx);
+        if let Some(on_highlight) = self.on_highlight.clone() {
+            let key = key.clone();
+            after_update(window, cx, move |window, cx| {
+                on_highlight(&key, &ListHighlightDetails { index, event }, window, cx)
+            });
         }
     }
 

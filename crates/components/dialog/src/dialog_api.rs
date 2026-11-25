@@ -195,7 +195,8 @@ pub struct DialogRules<T: DialogHost> {
     /// Runs before a dismissal is decided. Return true to handle it instead,
     /// like a sheet stepping down on the back gesture.
     pub intercept: Option<InterceptFn<T>>,
-    /// Runs after a dismissal was refused, after `on_dismiss_attempt`.
+    /// Runs after a dismissal was refused, inside the update, which
+    /// `on_dismiss_attempt` hears once it's over.
     pub on_refuse: Option<DialogHook<T, DismissAttemptReason>>,
     /// How it presents when its preset doesn't decide: a dialog, or a
     /// drawer's sheet.

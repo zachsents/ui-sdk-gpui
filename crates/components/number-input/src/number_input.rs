@@ -63,7 +63,8 @@ pub struct NumberInputOptions {
     pub on_before_value_change: Option<ChangeCallback<Option<f64>>>,
     /// Runs once an interaction that changed the value ends: typing is
     /// committed, a key or a button is released, or a scrub ends. For
-    /// saving.
+    /// saving. It runs once the input's update is over, so it may update any
+    /// entity, the input too.
     pub on_value_commit: Option<CommitCallback<Option<f64>>>,
     /// The lowest value. Typed values below it are raised to it when
     /// committed.
@@ -417,7 +418,7 @@ impl NumberInput {
         let settings = settings(&options);
         let (controlled, default_value) = (number_of(options.value), finite(options.default_value));
         let start = controlled.unwrap_or(default_value);
-        let mut value = Controllable::new("value", start).after_update();
+        let mut value = Controllable::new("value", start);
         value.set_controlled(controlled);
         value.set_on_change(options.on_value_change.clone());
         value.set_on_before_change(options.on_before_value_change.clone());

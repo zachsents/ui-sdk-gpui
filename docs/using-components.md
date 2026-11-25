@@ -179,7 +179,7 @@ use ui_sdk::kernel::Reason;
 
 let details = cx.new(|cx| {
     Popover::new(
-        PopoverOptions::default().on_open_change(|open, details, _window, _cx| {
+        PopoverOptions::default().on_before_open_change(|open, details, _window, _cx| {
             if !*open && details.reason == Reason::OutsidePress {
                 details.cancel();
             }
@@ -190,7 +190,7 @@ let details = cx.new(|cx| {
 });
 ```
 
-Escape and the trigger still close it. Canceling works whether the value is controlled or not. A component's `value` is refused in its own callback, `on_before_value_change`, since `on_value_change` hears the value once it has changed ([When Callbacks Run](#when-callbacks-run)). A few callbacks get details of their own, which dereference to `ChangeDetails` and add a field, like a slider's `details.thumb`.
+Escape and the trigger still close it. Canceling works whether the value is controlled or not. A change is refused in its `on_before_*` callback, like `on_before_open_change` here, since `on_open_change` hears the change once it has happened ([When Callbacks Run](#when-callbacks-run)). A few callbacks get details of their own, which dereference to `ChangeDetails` and add a field, like a slider's `details.thumb`.
 
 ### Commit a Value
 
@@ -212,11 +212,11 @@ Number Input, Color Picker and OTP Input have `on_value_commit` too, Resizable h
 
 ### When Callbacks Run
 
-`on_value_change` and `on_value_commit` run once the update that changed the value is over, so they can update any entity: the view that holds the component, and the component itself. That holds for typing and for your own calls: when the view clears an input it holds with `clear`, the input's `on_value_change` can update the view, which is still in the middle of its update when it calls `clear`, since the callback runs once that update is over too. They hear the change after it happened, so `details.cancel()` there does nothing, and debug builds warn about it.
+A component's callbacks, like `on_value_change`, `on_open_change`, `on_checked_change` and `on_value_commit`, run once the update that set them off is over, so they can update any entity: the view that holds the component, and the component itself. That holds for a click or typing and for your own calls: when the view clears an input it holds with `clear`, the input's `on_value_change` can update the view, which is still in the middle of its update when it calls `clear`, since the callback runs once that update is over too. They hear a change after it happened, so `details.cancel()` there does nothing, and debug builds warn about it.
 
-To refuse a value, or look at it before it's taken, use `on_before_value_change`, which every component with a value has. It runs while gpui is updating the component, before the value changes, and `details.cancel()` keeps the value as it was.
+To refuse a change, or look at it before it's taken, use its `on_before_*` callback, like `on_before_value_change` or `on_before_open_change`, which every change that can be refused has. It runs while gpui is updating the component, before the change, and `details.cancel()` keeps things as they were. Toggle Group and Checkbox Group's `on_before_value_change` also run inside the update of the toggle or checkbox that changed. An `on_before_*` callback can update any other entity, but reading or updating the component itself, or whatever called into it, panics, since gpui doesn't allow that while an entity is being updated. To change the component from there, defer the change with `window.defer(cx, ..)`, which runs once the update is over.
 
-Every other callback, like `on_open_change` or `on_checked_change`, runs while gpui is updating its component, which is what lets it cancel. Toggle Group and Checkbox Group's `on_before_value_change` also run inside the update of the toggle or checkbox that changed. These can update any other entity, which is how the toggle above reaches the view, but reading or updating the component itself, or whatever called into it, panics, since gpui doesn't allow that while an entity is being updated. To change the component from there, defer the change with `window.defer(cx, ..)`, which runs once the update is over. `crates/components/combobox/examples/combobox.rs` does this to choose the label its create option adds.
+Handlers whose return value the component uses, like an action returning an `ActionOutcome`, run at the press, inside the update, since what they return decides what the part does next.
 
 ### Log Changes
 

@@ -60,14 +60,17 @@ pub struct PasswordInputOptions {
     pub visible: Option<bool>,
     /// Whether the password is shown at first, when uncontrolled.
     pub default_visible: bool,
-    /// Runs when the password wants to be shown or hidden: the toggle
-    /// (`TogglePress`), submitting or resetting its form (`FormSubmit`,
-    /// `Reset`), the window being hidden (`PageHide`) or a call
-    /// (`Imperative`). `details.cancel()` keeps it as it was; the field is a
-    /// password field while its form reads a submit either way. It runs
-    /// inside the password input's update, so it may update any entity but
-    /// it.
+    /// Runs when the password is shown or hidden: the toggle (`TogglePress`),
+    /// submitting or resetting its form (`FormSubmit`, `Reset`), the window
+    /// being hidden (`PageHide`) or a call (`Imperative`). It runs once the
+    /// password input's update is over, so it may update any entity, the
+    /// password input too.
     pub on_visible_change: Option<ChangeCallback<bool>>,
+    /// Runs as the password is asked to be shown or hidden, before it is,
+    /// inside the password input's update: `details.cancel()` keeps it as it
+    /// was; the field is a password field while its form reads a submit either
+    /// way. It may update any entity but the password input.
+    pub on_before_visible_change: Option<ChangeCallback<bool>>,
     /// The name the password submits under. Inside a Field, the Field's name.
     pub name: Option<SharedString>,
     /// The id of the form the field belongs to, when it isn't inside it.
@@ -140,6 +143,14 @@ impl PasswordInputOptions {
         callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_visible_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_visible_change(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_visible_change = Some(Rc::new(callback));
         self
     }
 
@@ -354,6 +365,7 @@ impl PasswordInput {
         let mut visible = Controllable::new("visible", options.visible.unwrap_or(options.default_visible));
         visible.set_controlled(options.visible);
         visible.set_on_change(options.on_visible_change.clone());
+        visible.set_on_before_change(options.on_before_visible_change.clone());
         let shown = *visible.get();
         let settings = options.settings();
         let field_options = field_options(&settings, shown, &internals);
@@ -438,6 +450,7 @@ impl PasswordInput {
         }
         changed |= self.visible.set_controlled(options.visible);
         self.visible.set_on_change(options.on_visible_change.clone());
+        self.visible.set_on_before_change(options.on_before_visible_change.clone());
         let settings = options.settings();
         if settings.pattern != self.settings.pattern {
             self.pattern = compile_pattern(settings.pattern.as_deref(), &self.instance);

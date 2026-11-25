@@ -107,7 +107,9 @@ pub struct ColorPickerOptions {
     /// stops it. It may update any entity but the picker.
     pub on_before_value_change: Option<ColorPickerValueChange>,
     /// Runs once an interaction that changed the value ends: the pointer
-    /// lifts, a key is pressed, a swatch is picked. For saving.
+    /// lifts, a key is pressed, a swatch is picked. For saving. It runs once
+    /// the picker's update is over, so it may update any entity, the picker
+    /// too.
     pub on_value_commit: Option<ColorPickerValueCommit>,
     /// The space the parts edit in, which decides their channels: `Hsv` has
     /// hue, saturation and brightness, `Hsl` hue, saturation and lightness,
@@ -491,7 +493,7 @@ impl ColorPicker {
             .and_then(|given| color_in(given, settings.space))
             .unwrap_or_else(|| black(settings.space));
         let start = given.unwrap_or_else(|| settings.output(&color));
-        let mut value = Controllable::new("value", start.clone()).after_update();
+        let mut value = Controllable::new("value", start.clone());
         value.set_controlled(options.value.clone());
         let mut instance = Instance::new("color-picker").with_agent(cx);
         instance.debug = options.debug;

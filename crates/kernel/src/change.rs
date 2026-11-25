@@ -8,16 +8,15 @@
 //!
 //! Controlling a value: the app passes `Some(value)` with the component's
 //! setter, typically from its own `render`, the way a framework re-renders
-//! with new props. The callback runs inside the component's update, so it may
-//! update any entity but the component itself; the app's own state, then a
-//! re-render that passes the value back, is the usual shape.
+//! with new props. The app's own state, then a re-render that passes the
+//! value back, is the usual shape.
 //!
-//! A key made with [`Controllable::after_update`], like every component's
-//! `value`, runs its callbacks once the update that changed it is over
-//! instead, so they may update any entity: the component, and whatever
-//! called into it, like an app clearing a field it holds. Such a change is
-//! refused before it happens, inside the update, by the callback
-//! [`Controllable::set_on_before_change`] gives it.
+//! The callbacks run once the update that changed the key is over, so they
+//! may update any entity: the component, and whatever called into it, like
+//! an app clearing a field it holds. A change is refused before it happens,
+//! inside the update, by the callback [`Controllable::set_on_before_change`]
+//! gives the key. A component's other callbacks run the same way, through
+//! [`after_update`].
 
 use std::cell::{Cell, RefCell};
 use std::fmt::Debug;
@@ -26,7 +25,9 @@ use std::time::Duration;
 
 use gpui::{App, SharedString, Window};
 
-use super::details::{ChangeDetails, ChangeOptions, ChangeSource, InputEvent, Reason, resolve_source, with_source};
+use super::details::{
+    ChangeDetails, ChangeOptions, ChangeSource, InputEvent, Reason, resolve_source, with_optional_source, with_source,
+};
 use super::dev::{self, Origin};
 use super::keep;
 use super::option_names::{CallbackKind, callback_name};
@@ -46,9 +47,7 @@ pub struct Controllable<T> {
     controlled: Option<T>,
     on_change: Option<ChangeCallback<T>>,
     on_commit: Option<CommitCallback<T>>,
-    // With `after_update`: `on_change` and `on_commit` run once the update
-    // is over, and `on_before_change`, inside it, is what may cancel.
-    after: bool,
+    // Runs inside the update, before the change, and may cancel it.
     on_before_change: Option<ChangeCallback<T>>,
     // The value the key is changing to while its callback runs, so asking for
     // the same value from inside does nothing (`changing` in the original).
@@ -80,7 +79,6 @@ impl<T: Clone + PartialEq + Debug + 'static> Controllable<T> {
             controlled: None,
             on_change: None,
             on_commit: None,
-            after: false,
             on_before_change: None,
             changing: None,
             requested: None,
@@ -90,16 +88,6 @@ impl<T: Clone + PartialEq + Debug + 'static> Controllable<T> {
             generation: Cell::new(0),
             warned_release: false,
         }
-    }
-
-    /// Runs `on_change` and `on_commit` once the update that changed the key
-    /// is over, rather than inside it, so they may update any entity, the
-    /// component and whatever called into it too. They hear the change
-    /// after it happened and can't refuse it: `set_on_before_change` gives
-    /// the callback that can.
-    pub fn after_update(mut self) -> Self {
-        self.after = true;
-        self
     }
 
     pub fn key(&self) -> &'static str {
@@ -164,10 +152,9 @@ impl<T: Clone + PartialEq + Debug + 'static> Controllable<T> {
         self.on_commit = callback;
     }
 
-    /// For a key made with `after_update`: what runs as a change is asked
-    /// for, before it happens, inside the component's update, where
-    /// `details.cancel()` refuses it. It may update any entity but the
-    /// component and what called into it.
+    /// What runs as a change is asked for, before it happens, inside the
+    /// component's update, where `details.cancel()` refuses it. It may update
+    /// any entity but the component and what called into it.
     pub fn set_on_before_change(&mut self, callback: Option<ChangeCallback<T>>) {
         self.on_before_change = callback;
     }
@@ -182,14 +169,12 @@ impl<T: Clone + PartialEq + Debug + 'static> Controllable<T> {
         !self.is_controlled()
     }
 
-    /// Asks for `value` (`change(key, value, details)`): runs `on_change`,
-    /// then writes it unless the key is controlled or the callback canceled.
+    /// Asks for `value` (`change(key, value, details)`): runs
+    /// `on_before_change`, then writes it unless the key is controlled or
+    /// the callback canceled, and runs `on_change` once the update is over.
     /// Returns whether the request went through: false when the value is
     /// already the same or the change was canceled. For a controlled key,
-    /// true means accepted; the app still passes the value back. A key made
-    /// with `after_update` runs `on_before_change` where `on_change` would
-    /// run, and `on_change` once the update is over, for a change that went
-    /// through.
+    /// true means accepted; the app still passes the value back.
     pub fn change(
         &mut self,
         instance: &Instance,
@@ -217,9 +202,8 @@ impl<T: Clone + PartialEq + Debug + 'static> Controllable<T> {
         instance.debug_change(self.key, &value, &details);
         let controlled = self.is_controlled();
         let outer = self.changing.replace(value.clone());
-        let inside = if self.after { &self.on_before_change } else { &self.on_change };
         with_source(details.source, || {
-            if let Some(callback) = inside.clone() {
+            if let Some(callback) = self.on_before_change.clone() {
                 callback(&value, &details, window, cx);
             }
         });
@@ -232,9 +216,7 @@ impl<T: Clone + PartialEq + Debug + 'static> Controllable<T> {
             self.held = value.clone();
         }
         watchers::emit_change_of(instance, self.key, &value, &previous, &details, false, controlled);
-        if self.after
-            && let Some(callback) = self.on_change.clone()
-        {
+        if let Some(callback) = self.on_change.clone() {
             self.run_after(instance, callback, value.clone(), details.clone(), true, window, cx);
         }
         if controlled {
@@ -276,20 +258,15 @@ impl<T: Clone + PartialEq + Debug + 'static> Controllable<T> {
         if keep::is_destroying() {
             return;
         }
-        let source = resolve_source(reason, event.as_ref());
-        let details = ChangeDetails::new(reason, source, event);
+        let details = ChangeDetails::new(reason, resolve_source(reason, event.as_ref()), event);
         if let Some(callback) = self.on_commit.clone() {
-            if self.after {
-                self.run_after(instance, callback, value.clone(), details.clone(), false, window, cx);
-            } else {
-                with_source(source, || callback(value, &details, window, cx));
-            }
+            self.run_after(instance, callback, value.clone(), details.clone(), false, window, cx);
         }
         watchers::emit_commit_of(instance, self.key, value, &details);
     }
 
-    // Runs a callback of an `after_update` key once the update is over, with
-    // the source the change had. Development builds warn about a change's
+    // Runs a callback once the update is over, with the source the change
+    // had. Development builds warn about a change's
     // `details.cancel()` there, which comes too late to refuse anything.
     #[allow(clippy::too_many_arguments)]
     fn run_after(
@@ -342,7 +319,6 @@ impl<T: Clone + PartialEq + Debug + 'static> Controllable<T> {
         let source = details.source.as_str();
         let component = instance.label().clone();
         let id = instance.id().clone();
-        let after = self.after;
         cx.spawn(async move |cx| {
             cx.background_executor().timer(Duration::from_secs(1)).await;
             let still = expecting
@@ -351,11 +327,7 @@ impl<T: Clone + PartialEq + Debug + 'static> Controllable<T> {
                 .is_some();
             if still {
                 let callback = callback_name(key, CallbackKind::Change);
-                let refuse = if after {
-                    format!("refuse it with `details.cancel()` in `{}`", callback.replacen("on_", "on_before_", 1))
-                } else {
-                    "call `details.cancel()` there to refuse".to_string()
-                };
+                let refuse = format!("refuse it with `details.cancel()` in `{}`", callback.replacen("on_", "on_before_", 1));
                 dev::warn(
                     &format!(
                         "asked {asked_text} (`{reason}`, `{source}`), and `{key}` stayed {before_text}. Update it in `{callback}`, right away even when a save or navigation follows, or {refuse}."
@@ -415,4 +387,13 @@ pub fn log_with(
 /// `ChangeOptions::reason(reason).source(source)`.
 pub fn change_from(options: ChangeOptions, source: ChangeSource) -> ChangeOptions {
     options.source(source)
+}
+
+/// Runs a component's callback once the update that called it is over, as
+/// every `on_*` option runs, so it may update any entity, the component and
+/// whatever called into it too. The changes it makes report the source the
+/// interaction had.
+pub fn after_update(window: &mut Window, cx: &mut App, callback: impl FnOnce(&mut Window, &mut App) + 'static) {
+    let source = super::details::current_source();
+    window.defer(cx, move |window, cx| with_optional_source(source, || callback(window, cx)));
 }

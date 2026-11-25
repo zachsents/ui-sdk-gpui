@@ -15,7 +15,7 @@ use gpui::{
     Stateful, StatefulInteractiveElement, Subscription, Window, div,
 };
 use ui_sdk_kernel::part::{PartElement, with_aria};
-use ui_sdk_kernel::{Aria, InputEvent};
+use ui_sdk_kernel::{Aria, InputEvent, after_update};
 
 use crate::control::activate_control;
 use crate::document::{
@@ -60,14 +60,17 @@ pub struct FormOptions {
     /// Submits without validating its controls first (`novalidate`).
     pub no_validate: bool,
     /// Runs when it submits, with what its controls submit, in page order.
-    /// It runs inside whatever update submitted, so it may update any entity
-    /// but the one whose press or key submitted.
+    /// It runs once the update that submitted is over, so it may update any
+    /// entity, the one whose press or key submitted too.
     pub on_submit: Option<SubmitCallback>,
-    /// Runs when it's about to reset. `event.prevent_default()` stops the
-    /// reset.
+    /// Runs when it resets, once the update that reset it is over.
     pub on_reset: Option<FormListener>,
+    /// Runs when it's about to reset, inside the update that resets it.
+    /// `event.prevent_default()` stops the reset.
+    pub on_before_reset: Option<FormListener>,
     /// Runs when a submit, or `report_validity`, finds a control invalid and
-    /// nothing canceled its `Invalid`: where a browser shows its message.
+    /// nothing canceled its `Invalid`: where a browser shows its message. It
+    /// runs once the update that found it is over.
     pub on_report: Option<ReportCallback>,
 }
 
@@ -92,6 +95,11 @@ impl FormOptions {
 
     pub fn on_reset(mut self, callback: impl Fn(&FormEvent, &mut Window, &mut App) + 'static) -> Self {
         self.on_reset = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_reset(mut self, callback: impl Fn(&FormEvent, &mut Window, &mut App) + 'static) -> Self {
+        self.on_before_reset = Some(Rc::new(callback));
         self
     }
 
@@ -281,7 +289,7 @@ impl Form {
                 anchor: control.anchor(),
                 message: control.validation_message(),
             };
-            on_report(&report, window, cx);
+            after_update(window, cx, move |window, cx| on_report(&report, window, cx));
         }
     }
 
@@ -344,7 +352,7 @@ impl Form {
                 submitter: submitter.cloned(),
                 event,
             };
-            on_submit(&data, &details, window, cx);
+            after_update(window, cx, move |window, cx| on_submit(&data, &details, window, cx));
         }
     }
 
@@ -353,13 +361,22 @@ impl Form {
     /// update is done. What `after_reset` queued runs after them.
     pub fn reset(&self, window: &mut Window, cx: &mut App) {
         let event = FormEvent::new(FormEventType::Reset, self.node.clone());
-        let on_reset = self.facts().options.on_reset.clone();
-        if let Some(on_reset) = on_reset {
-            on_reset(&event, window, cx);
+        let (before, on_reset) = {
+            let facts = self.facts();
+            (facts.options.on_before_reset.clone(), facts.options.on_reset.clone())
+        };
+        if let Some(before) = before {
+            before(&event, window, cx);
         }
         dispatch(&event, window, cx);
         if event.default_prevented() {
             return;
+        }
+        if let Some(on_reset) = on_reset {
+            let node = self.node.clone();
+            after_update(window, cx, move |window, cx| {
+                on_reset(&FormEvent::new(FormEventType::Reset, node), window, cx)
+            });
         }
         let after = std::mem::take(&mut *event.after.borrow_mut());
         let form = self.clone();

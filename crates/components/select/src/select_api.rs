@@ -17,7 +17,7 @@ use ui_sdk_forms::{
 use ui_sdk_kernel::bound_keys::bound;
 use ui_sdk_kernel::focus_events::on_focus_in;
 use ui_sdk_kernel::modality::{Modality, ModalityTracker, modality_of, move_focus, track_modality};
-use ui_sdk_kernel::{ChangeOptions, Controllable, InputEvent, Instance, Reason};
+use ui_sdk_kernel::{ChangeOptions, Controllable, InputEvent, Instance, Reason, after_update};
 use ui_sdk_lists::async_options::AsyncOptionsStatus;
 use ui_sdk_lists::item_icon::{ItemIconsFeature, item_icons_feature, option_icon};
 use ui_sdk_lists::listbox::create_filtered_listbox;
@@ -238,7 +238,7 @@ impl<T: ItemKey + Clone + PartialEq + Debug + 'static> Select<T> {
             .clone()
             .or_else(|| options.default_value.clone())
             .unwrap_or_else(|| empty.clone());
-        let mut value = Controllable::new("value", first.clone()).after_update();
+        let mut value = Controllable::new("value", first.clone());
         value.set_controlled(options.value.clone());
         value.set_on_change(options.on_value_change.clone());
         value.set_on_before_change(options.on_before_value_change.clone());
@@ -296,7 +296,15 @@ impl<T: ItemKey + Clone + PartialEq + Debug + 'static> Select<T> {
         let load_more = create_load_more(
             |this: &Self| this.listbox.count(this),
             |this| this.status,
-            |this| this.on_load_more.clone(),
+            // It runs once the select's update is over.
+            |this| {
+                this.on_load_more.clone().map(|load| {
+                    Rc::new(move |window: &mut Window, cx: &mut App| {
+                        let load = load.clone();
+                        after_update(window, cx, move |window, cx| load(window, cx));
+                    }) as LoadMoreFn
+                })
+            },
         );
 
         let placement = Rc::new(Placement {
@@ -414,11 +422,8 @@ impl<T: ItemKey + Clone + PartialEq + Debug + 'static> Select<T> {
 
     // The options the popup reads from the select's.
     fn popup_options(options: &SelectOptions<T>) -> PopupOptions<()> {
-        let on_open_change = options.on_open_change.clone();
-        PopupOptions {
-            open: options.open,
-            default_open: options.default_open,
-            on_open_change: on_open_change.map(|callback| {
+        let without_value = |callback: &Option<ui_sdk_kernel::ChangeCallback<bool>>| {
+            callback.clone().map(|callback| {
                 Rc::new(
                     move |open: &bool,
                           details: &ui_sdk_kernel::ChangeDetails,
@@ -426,7 +431,13 @@ impl<T: ItemKey + Clone + PartialEq + Debug + 'static> Select<T> {
                           window: &mut Window,
                           cx: &mut App| { callback(open, details, window, cx) },
                 ) as ui_sdk_popups::PopupOpenChangeCallback
-            }),
+            })
+        };
+        PopupOptions {
+            open: options.open,
+            default_open: options.default_open,
+            on_open_change: without_value(&options.on_open_change),
+            on_before_open_change: without_value(&options.on_before_open_change),
             on_open_change_complete: options.on_open_change_complete.clone(),
             modal: options.modal,
             presentation: options.presentation,
@@ -1005,7 +1016,7 @@ impl<T: ItemKey + Clone + PartialEq + Debug + 'static> Select<T> {
             index,
             event: event.cloned(),
         };
-        on_highlight(value.as_ref(), &details, window, cx);
+        after_update(window, cx, move |window, cx| on_highlight(value.as_ref(), &details, window, cx));
     }
 
     // The pointer highlights what it moves onto, focusing it unless focus

@@ -6,8 +6,9 @@
 //!
 //! A toaster is an entity the regions that show it observe: every change
 //! notifies it. Its handle, [`Toaster`], is cheap to clone, and its calls run
-//! `on_dismiss` outside the queue's own update, so a callback may add or
-//! update toasts.
+//! `on_before_dismiss` outside the queue's own update, so a callback may add
+//! or update toasts, and `on_dismiss` once the update that closed the toast
+//! is over.
 
 use std::any::Any;
 use std::cell::Cell;
@@ -55,8 +56,8 @@ impl ToastType {
 /// `Action` or `Imperative`, from the shared vocabulary.
 pub type ToastDismissReason = Reason;
 
-/// What `on_dismiss` receives. `cancel()` keeps the toast, like a swipe that
-/// snaps back.
+/// What `on_before_dismiss` and `on_dismiss` receive. `cancel()` in
+/// `on_before_dismiss` keeps the toast, like a swipe that snaps back.
 pub type ToastDismissDetails = ChangeDetails;
 
 /// What a toast's action and close buttons receive after the event: how the
@@ -64,21 +65,26 @@ pub type ToastDismissDetails = ChangeDetails;
 pub type ToastActionDetails = ActionDetails;
 
 /// What an action runs when it's pressed: the event behind it, when there is
-/// one, and how it was pressed. It runs inside the region's update, so it may
-/// update any entity but the region. Return [`ActionOutcome::wait`] with work
+/// one, and how it was pressed. It runs inside the region's update, since the
+/// region reads what it returns, so it may update any entity but the region.
+/// Return [`ActionOutcome::wait`] with work
 /// that goes on to mark the action pending, which dismisses the toast once
 /// it succeeds; a failure keeps the toast.
 pub type ToastActionHandler =
     Rc<dyn Fn(Option<&InputEvent>, &ToastActionDetails, &mut Window, &mut App) -> ActionOutcome>;
 
-/// What a cancel button runs when it's pressed, before the toast closes.
+/// What a cancel button runs when it's pressed, once the region's update is
+/// over, as the toast closes.
 pub type ToastCancelHandler =
     Rc<dyn Fn(Option<&InputEvent>, &ToastActionDetails, &mut Window, &mut App)>;
 
-/// What `on_dismiss` runs as a toast closes, with why. It runs inside the
-/// update of what closed it, like the region a swipe or a timer closed it
-/// in, so it may update any entity but that one. Adding, updating and
-/// dismissing toasts is fine: the queue isn't in an update then.
+/// What runs as a toast closes, with why. As `on_dismiss`, it runs once the
+/// update of what closed it is over, so it may update any entity. As
+/// `on_before_dismiss`, it runs before the toast closes, inside the update of
+/// what closed it, like the region a swipe or a timer closed it in, so it
+/// may update any entity but that one, and `details.cancel()` keeps the
+/// toast. Adding, updating and dismissing toasts is fine there: the queue
+/// isn't in an update then.
 pub type ToastDismissCallback = Rc<dyn Fn(&ToastDismissDetails, &mut App)>;
 
 /// A button in the toast that does something, like Undo.
@@ -149,8 +155,8 @@ impl fmt::Debug for ToastAction {
 pub struct ToastCancel {
     /// The button's text.
     pub label: SharedString,
-    /// Runs when it's pressed, before the toast closes. `details.source` says
-    /// how it was pressed.
+    /// Runs when it's pressed, once the region's update is over, as the
+    /// toast closes. `details.source` says how it was pressed.
     pub on_cancel: Option<ToastCancelHandler>,
 }
 
@@ -213,10 +219,13 @@ pub struct ToastOptions {
     pub dismissible: Option<bool>,
     /// Anything else, for your own rendering, like an avatar.
     pub data: Option<Rc<dyn Any>>,
-    /// Runs when it closes, with why. Calling `details.cancel()` keeps it. It
-    /// runs inside the update of what closed it, like the region, so it may
-    /// update any entity but that one.
+    /// Runs when it closes, with why, once the update of what closed it is
+    /// over, so it may update any entity.
     pub on_dismiss: Option<ToastDismissCallback>,
+    /// Runs as it's asked to close, before it does, inside the update of what
+    /// closed it, like the region: `details.cancel()` keeps it. It may update
+    /// any entity but that one.
+    pub on_before_dismiss: Option<ToastDismissCallback>,
 }
 
 impl ToastOptions {
@@ -282,6 +291,14 @@ impl ToastOptions {
         self
     }
 
+    pub fn on_before_dismiss(
+        mut self,
+        on_before_dismiss: impl Fn(&ToastDismissDetails, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_dismiss = Some(Rc::new(on_before_dismiss));
+        self
+    }
+
     /// These options with `extra`'s on top, where it sets them (the
     /// original's `{ ...options, ...extra }`).
     pub fn merge(self, extra: ToastOptions) -> Self {
@@ -297,6 +314,7 @@ impl ToastOptions {
             dismissible: extra.dismissible.or(self.dismissible),
             data: extra.data.or(self.data),
             on_dismiss: extra.on_dismiss.or(self.on_dismiss),
+            on_before_dismiss: extra.on_before_dismiss.or(self.on_before_dismiss),
         }
     }
 }
@@ -339,6 +357,7 @@ impl fmt::Debug for ToastOptions {
             .field("dismissible", &self.dismissible)
             .field("data", &self.data.is_some())
             .field("on_dismiss", &self.on_dismiss.is_some())
+            .field("on_before_dismiss", &self.on_before_dismiss.is_some())
             .finish()
     }
 }
@@ -362,6 +381,7 @@ pub struct Toast {
     pub dismissible: bool,
     pub data: Option<Rc<dyn Any>>,
     pub on_dismiss: Option<ToastDismissCallback>,
+    pub on_before_dismiss: Option<ToastDismissCallback>,
     /// Increases with every update, so a region announces it again and
     /// restarts its timer.
     pub version: u64,
@@ -608,6 +628,9 @@ impl ToasterQueue {
             on_dismiss: options
                 .on_dismiss
                 .or(previous.and_then(|previous| previous.on_dismiss.clone())),
+            on_before_dismiss: options
+                .on_before_dismiss
+                .or(previous.and_then(|previous| previous.on_before_dismiss.clone())),
             version: previous.map_or(0, |previous| previous.version) + 1,
             order: previous.map_or_else(|| next(&ORDERS), |previous| previous.order),
         }
@@ -857,9 +880,10 @@ impl Toaster {
         cx.observe(&self.queue, move |_, cx| listener(cx))
     }
 
-    /// Closes a toast for a reason, unless `on_dismiss` cancels. Returns
-    /// whether it closed. `on_dismiss` runs before the queue changes, outside
-    /// its update.
+    /// Closes a toast for a reason, unless `on_before_dismiss` cancels.
+    /// Returns whether it closed. `on_before_dismiss` runs before the queue
+    /// changes, outside its update, and `on_dismiss` once the update that
+    /// closed it is over.
     pub fn close(
         &self,
         id: &str,
@@ -867,19 +891,19 @@ impl Toaster {
         event: Option<InputEvent>,
         cx: &mut App,
     ) -> bool {
-        let Some((version, on_dismiss)) = self
+        let Some((version, on_before_dismiss, on_dismiss)) = self
             .queue
             .read(cx)
             .find(id)
-            .map(|toast| (toast.version, toast.on_dismiss.clone()))
+            .map(|toast| (toast.version, toast.on_before_dismiss.clone(), toast.on_dismiss.clone()))
         else {
             return false;
         };
         let source = change_source(reason, event.as_ref());
         let details = create_details(reason, event, source);
         // What it changes in turn reports the same source.
-        if let Some(on_dismiss) = on_dismiss {
-            with_source(source, || on_dismiss(&details, cx));
+        if let Some(on_before_dismiss) = on_before_dismiss {
+            with_source(source, || on_before_dismiss(&details, cx));
         }
         if details.canceled() {
             return false;
@@ -890,6 +914,10 @@ impl Toaster {
                 .retain(|toast| !(toast.id.as_ref() == id && toast.version == version));
             cx.notify();
         });
+        // A toast can close with no window at hand, so the app defers it.
+        if let Some(on_dismiss) = on_dismiss {
+            cx.defer(move |cx| with_source(source, || on_dismiss(&details, cx)));
+        }
         true
     }
 

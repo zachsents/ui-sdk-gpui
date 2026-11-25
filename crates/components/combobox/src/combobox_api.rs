@@ -29,7 +29,7 @@ use ui_sdk_kernel::modality::{ModalityTracker, modality_of, restore_focus, track
 use ui_sdk_kernel::watchers;
 use ui_sdk_kernel::{
     ActionOutcome, AnnouncePending, ChangeDetails, ChangeOptions, Controllable, InputEvent, Instance, Key, Parts,
-    Reason, focus_events, held, name_of, resolve_source, run_action, with_source,
+    Reason, after_update, focus_events, held, name_of, resolve_source, run_action, with_source,
 };
 use ui_sdk_lists::{
     AnnounceResults, AnnounceResultsOptions, AsyncOptionsStatus, FieldName, HighlightOptions, ItemKey,
@@ -340,7 +340,7 @@ impl<T: ComboboxItemValue> Combobox<T> {
             .default_value
             .clone()
             .unwrap_or_else(|| ListValue::empty(multiple));
-        let mut value = Controllable::new("value", starting.clone()).after_update();
+        let mut value = Controllable::new("value", starting.clone());
         value.set_controlled(options.value.clone());
         value.set_on_change(options.on_value_change.clone());
         value.set_on_before_change(options.on_before_value_change.clone());
@@ -352,6 +352,7 @@ impl<T: ComboboxItemValue> Combobox<T> {
         let mut query = Controllable::new("query", query_text.clone());
         query.set_controlled(options.query.clone());
         query.set_on_change(options.on_query_change.clone());
+        query.set_on_before_change(options.on_before_query_change.clone());
 
         let field = cx.new(|cx| TextField::new(field_options(&options, &query_text, options.disabled), window, cx));
         let field_handle = field.read(cx).focus_handle(cx);
@@ -425,7 +426,15 @@ impl<T: ComboboxItemValue> Combobox<T> {
         let load_more = create_load_more(
             |this: &Self| this.listbox.count(this),
             |this: &Self| this.status,
-            |this: &Self| this.options.on_load_more.clone() as Option<LoadMoreFn>,
+            // The app's `on_load_more` runs once the combobox's update is over.
+            |this: &Self| {
+                this.options.on_load_more.clone().map(|load| {
+                    Rc::new(move |window: &mut Window, cx: &mut App| {
+                        let load = load.clone();
+                        after_update(window, cx, move |window, cx| load(window, cx));
+                    }) as LoadMoreFn
+                })
+            },
         );
         let combobox = Self {
             instance,
@@ -633,6 +642,9 @@ fn popup_options<T: ComboboxItemValue>(options: &ComboboxOptions<T>) -> PopupOpt
     if let Some(callback) = options.on_open_change.clone() {
         popup = popup.on_open_change(move |open, details, window, cx| callback(open, details, window, cx));
     }
+    if let Some(callback) = options.on_before_open_change.clone() {
+        popup = popup.on_before_open_change(move |open, details, window, cx| callback(open, details, window, cx));
+    }
     popup.on_open_change_complete = options.on_open_change_complete.clone();
     popup.modal = options.modal;
     popup.presentation = options.presentation;
@@ -711,6 +723,7 @@ impl<T: ComboboxItemValue> Combobox<T> {
         self.value.set_on_before_change(options.on_before_value_change.clone());
         changed |= self.query.set_controlled(options.query.clone());
         self.query.set_on_change(options.on_query_change.clone());
+        self.query.set_on_before_change(options.on_before_query_change.clone());
         changed |= self.popup.set_options(popup_options(&options), cx);
         self.options = options;
         // What a value from options asks of the query reaches
@@ -850,14 +863,15 @@ impl<T: ComboboxItemValue> Combobox<T> {
     }
 
     // A label a value from options showed in its own pass is past refusing,
-    // so `on_query_change` hears it, and canceling keeps the text
+    // so only `on_query_change` hears it, once the update is over
     // (`reportQuery`).
     fn report_query(&mut self, from: SharedString, to: SharedString, window: &mut Window, cx: &mut Context<Self>) {
         let source = resolve_source(Reason::Imperative, None);
         let details = ChangeDetails::new(Reason::Imperative, source, None);
         log_with(&self.instance, "query", &to, Reason::Imperative, Some(source));
         if let Some(callback) = self.options.on_query_change.clone() {
-            with_source(source, || callback(&to, &details, window, cx));
+            let (to, details) = (to.clone(), details.clone());
+            with_source(source, || after_update(window, cx, move |window, cx| callback(&to, &details, window, cx)));
         }
         watchers::emit_change_of(&self.instance, "query", &to, &from, &details, false, self.query.is_controlled());
     }
@@ -1385,7 +1399,7 @@ impl<T: ComboboxItemValue> Combobox<T> {
             index,
             event: event.cloned(),
         };
-        on_highlight(value.as_ref(), &details, window, cx);
+        after_update(window, cx, move |window, cx| on_highlight(value.as_ref(), &details, window, cx));
     }
 
     // The highlight as it is now, for a move nobody reported.

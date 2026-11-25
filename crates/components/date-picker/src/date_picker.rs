@@ -124,9 +124,13 @@ pub struct DatePickerOptions {
     /// date's month, else today's.
     pub default_month: Option<ISOMonth>,
     /// Runs when the months the calendar shows want to change, as in
-    /// Calendar, or a typed date or a preset turns them. It runs inside the
-    /// date picker's update.
+    /// Calendar, or a typed date or a preset turns them. It runs once the
+    /// date picker's update is over.
     pub on_month_change: Option<ChangeCallback<ISOMonth>>,
+    /// Runs as the months the calendar shows are asked to change, before they
+    /// do, inside the date picker's update: `details.cancel()` keeps them. It
+    /// may update any entity but the date picker.
+    pub on_before_month_change: Option<ChangeCallback<ISOMonth>>,
     /// The earliest date that can be typed or picked. Keys stop there, and
     /// Previous stops at its month.
     pub min: Option<ISODate>,
@@ -178,10 +182,13 @@ pub struct DatePickerOptions {
     pub open: Option<bool>,
     /// Whether the popup starts open, when uncontrolled.
     pub default_open: bool,
-    /// Runs when the popup wants to open or close. `details.reason` says why,
-    /// and `details.cancel()` stops it. It runs inside the date picker's
-    /// update.
+    /// Runs when the popup opens or closes, once the date picker's update is
+    /// over. `details.reason` says why.
     pub on_open_change: Option<ChangeCallback<bool>>,
+    /// Runs as the popup is asked to open or close, before it does, inside
+    /// the date picker's update: `details.cancel()` stops it. It may update
+    /// any entity but the date picker.
+    pub on_before_open_change: Option<ChangeCallback<bool>>,
     /// Runs once the popup has finished opening or closing, after any
     /// animation.
     pub on_open_change_complete: Option<OpenChangeCompleteCallback>,
@@ -236,6 +243,7 @@ impl Default for DatePickerOptions {
             month: None,
             default_month: None,
             on_month_change: None,
+            on_before_month_change: None,
             min: None,
             max: None,
             unavailable: None,
@@ -257,6 +265,7 @@ impl Default for DatePickerOptions {
             open: None,
             default_open: false,
             on_open_change: None,
+            on_before_open_change: None,
             on_open_change_complete: None,
             close_on_select: true,
             presentation: PresentationSetting::Default,
@@ -323,6 +332,14 @@ impl DatePickerOptions {
         callback: impl Fn(&ISOMonth, &ui_sdk_kernel::ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_month_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_month_change(
+        mut self,
+        callback: impl Fn(&ISOMonth, &ui_sdk_kernel::ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_month_change = Some(Rc::new(callback));
         self
     }
 
@@ -431,6 +448,14 @@ impl DatePickerOptions {
         callback: impl Fn(&bool, &ui_sdk_kernel::ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_open_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_open_change(
+        mut self,
+        callback: impl Fn(&bool, &ui_sdk_kernel::ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_open_change = Some(Rc::new(callback));
         self
     }
 

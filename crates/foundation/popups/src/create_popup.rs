@@ -20,7 +20,7 @@ use futures::StreamExt;
 use futures::channel::mpsc::{UnboundedSender, unbounded};
 use gpui::{AnyWindowHandle, App, Context, ElementId, FocusHandle, SharedString, Subscription, Task, Window};
 use ui_sdk_kernel::roles::Role;
-use ui_sdk_kernel::{
+use ui_sdk_kernel::{after_update, 
     ChangeCallback, ChangeDetails, ChangeOptions, ChangeSource, Controllable, Controller, InputEvent,
     Instance, InstanceHandle, Measured, flag_while_bound, with_optional_source,
 };
@@ -62,9 +62,11 @@ pub trait PopupHost: Sized + 'static {
     fn popup(&self) -> &Popup<Self>;
 }
 
-/// Hears the popup asking to open or close: the requested `open`, the
-/// details, and what closed it, like a Close part's `value`. It runs inside
-/// the component's update, so it may update any entity but the component.
+/// Hears the popup open or close: the requested `open`, the details, and
+/// what closed it, like a Close part's `value`. As `on_open_change`, it runs
+/// once the component's update is over, so it may update any entity, the
+/// component too; as `on_before_open_change`, it runs inside the update,
+/// before the popup opens or closes, where `details.cancel()` stops it.
 pub type PopupOpenChangeCallback = Rc<dyn Fn(&bool, &ChangeDetails, Option<&SharedString>, &mut Window, &mut App)>;
 
 /// Hears an open or a close finish, after any animation.
@@ -77,16 +79,21 @@ pub struct PopupOptions<P> {
     pub open: Option<bool>,
     /// Whether it starts open, when uncontrolled.
     pub default_open: bool,
-    /// Runs when it wants to open or close. `details.reason` says why, and
-    /// `details.cancel()` stops it.
+    /// Runs when it opens or closes, once the component's update is over.
+    /// `details.reason` says why.
     pub on_open_change: Option<PopupOpenChangeCallback>,
+    /// Runs when it's asked to open or close, before it does, inside the
+    /// component's update. `details.cancel()` stops it.
+    pub on_before_open_change: Option<PopupOpenChangeCallback>,
     /// Runs once it has finished opening or closing, after any animation.
     pub on_open_change_complete: Option<OpenChangeCompleteCallback>,
     /// Runs when the payload the content shows changes: a trigger with
     /// another payload opens it, or takes it over while open, and so does a
-    /// controller's `open(payload)` on the open popup. `details.cancel()`
-    /// keeps the previous payload.
+    /// controller's `open(payload)` on the open popup.
     pub on_payload_change: Option<ChangeCallback<Option<P>>>,
+    /// Runs as the payload is asked to change, before it does, inside the
+    /// component's update. `details.cancel()` keeps the previous payload.
+    pub on_before_payload_change: Option<ChangeCallback<Option<P>>>,
     /// Overrides the preset's `modal`.
     pub modal: Option<Modal>,
     /// How it presents. Decided each time it opens.
@@ -114,8 +121,10 @@ impl<P> Default for PopupOptions<P> {
             open: None,
             default_open: false,
             on_open_change: None,
+            on_before_open_change: None,
             on_open_change_complete: None,
             on_payload_change: None,
+            on_before_payload_change: None,
             modal: None,
             presentation: None,
             open_on_hover: false,
@@ -134,8 +143,10 @@ impl<P> Clone for PopupOptions<P> {
             open: self.open,
             default_open: self.default_open,
             on_open_change: self.on_open_change.clone(),
+            on_before_open_change: self.on_before_open_change.clone(),
             on_open_change_complete: self.on_open_change_complete.clone(),
             on_payload_change: self.on_payload_change.clone(),
+            on_before_payload_change: self.on_before_payload_change.clone(),
             modal: self.modal,
             presentation: self.presentation,
             open_on_hover: self.open_on_hover,
@@ -177,6 +188,26 @@ impl<P> PopupOptions<P> {
         self
     }
 
+    /// `on_before_open_change`, for a callback that doesn't read what closes
+    /// it.
+    pub fn on_before_open_change(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_open_change = Some(Rc::new(move |open, details, _, window, cx| callback(open, details, window, cx)));
+        self
+    }
+
+    /// `on_before_open_change` with what closes it, like a Close part's
+    /// `value`.
+    pub fn on_before_open_change_with_value(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, Option<&SharedString>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_open_change = Some(Rc::new(callback));
+        self
+    }
+
     pub fn on_open_change_complete(mut self, callback: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self {
         self.on_open_change_complete = Some(Rc::new(callback));
         self
@@ -187,6 +218,14 @@ impl<P> PopupOptions<P> {
         callback: impl Fn(&Option<P>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_payload_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_payload_change(
+        mut self,
+        callback: impl Fn(&Option<P>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_payload_change = Some(Rc::new(callback));
         self
     }
 
@@ -508,8 +547,9 @@ pub(crate) struct PopupInner<T: PopupHost> {
     pub(crate) modal: Cell<Modal>,
     pub(crate) presentation_value: Rc<Cell<Presentation>>,
     settings: RefCell<Settings>,
-    open_callback: Rc<RefCell<Option<PopupOpenChangeCallback>>>,
-    return_value: Rc<RefCell<Option<SharedString>>>,
+    // The app's `on_before_open_change` and `on_open_change`, which each
+    // change hands what closed it.
+    open_callbacks: RefCell<[Option<PopupOpenChangeCallback>; 2]>,
     gone_at_open: RefCell<Option<SharedString>>,
     only_trigger: Cell<Option<bool>>,
     was_open: Cell<bool>,
@@ -604,24 +644,13 @@ pub fn create_popup<T: PopupHost>(
     } = config;
     let initial = options.open.unwrap_or(options.default_open);
 
-    let open_callback: Rc<RefCell<Option<PopupOpenChangeCallback>>> = Rc::new(RefCell::new(options.on_open_change.clone()));
-    let return_value: Rc<RefCell<Option<SharedString>>> = Rc::new(RefCell::new(None));
+    let open_callbacks = RefCell::new([options.on_before_open_change.clone(), options.on_open_change.clone()]);
     let mut open = Controllable::new("open", initial);
     open.set_controlled(options.open);
-    {
-        let callback = open_callback.clone();
-        let value = return_value.clone();
-        open.set_on_change(Some(Rc::new(move |open: &bool, details: &ChangeDetails, window: &mut Window, cx: &mut App| {
-            let callback = callback.borrow().clone();
-            let value = value.borrow().clone();
-            if let Some(callback) = callback {
-                callback(open, details, value.as_ref(), window, cx);
-            }
-        })));
-    }
     let open = Rc::new(RefCell::new(open));
     let mut payload = Controllable::new("payload", None);
     payload.set_on_change(options.on_payload_change.clone());
+    payload.set_on_before_change(options.on_before_payload_change.clone());
     let payload = Rc::new(RefCell::new(payload));
     let trigger_key: Rc<RefCell<Option<SharedString>>> = Rc::new(RefCell::new(None));
     let presentation_value = Rc::new(Cell::new(Presentation::Popover));
@@ -717,7 +746,7 @@ pub fn create_popup<T: PopupHost>(
                 }
                 let complete = popup.inner.settings.borrow().on_open_change_complete.clone();
                 if let Some(complete) = complete {
-                    complete(open, window, cx);
+                    after_update(window, cx, move |window, cx| complete(open, window, cx));
                 }
             }));
             let layer = PopupLayer::new(layer_options, initial, window, cx);
@@ -844,8 +873,7 @@ pub fn create_popup<T: PopupHost>(
                     disabled: options.disabled,
                     on_open_change_complete: options.on_open_change_complete.clone(),
                 }),
-                open_callback,
-                return_value,
+                open_callbacks,
                 gone_at_open: RefCell::new(None),
                 only_trigger: Cell::new(None),
                 was_open: Cell::new(initial),
@@ -1219,8 +1247,9 @@ impl<T: PopupHost> Popup<T> {
     pub fn set_options(&self, options: PopupOptions<T::Payload>, cx: &mut Context<T>) -> bool {
         let inner = &self.inner;
         let (changed_open, source) = inner.open.borrow_mut().set_controlled_with_source(options.open);
-        *inner.open_callback.borrow_mut() = options.on_open_change.clone();
+        *inner.open_callbacks.borrow_mut() = [options.on_before_open_change.clone(), options.on_open_change.clone()];
         inner.payload.borrow_mut().set_on_change(options.on_payload_change.clone());
+        inner.payload.borrow_mut().set_on_before_change(options.on_before_payload_change.clone());
         if let Some(dismissal) = &inner.dismissal {
             dismissal.set_options(DismissOptions {
                 dismissible: options.dismissible,
@@ -1308,16 +1337,25 @@ impl<T: PopupHost> Popup<T> {
     }
 
     fn change_open(&self, this: &mut T, open: bool, change: OpenChange, window: &mut Window, cx: &mut Context<T>) -> bool {
-        *self.inner.return_value.borrow_mut() = change.return_value.clone();
+        // The callbacks hear what closed it, as the change has it.
+        let value = change.return_value.clone();
+        let with_value = |callback: &Option<PopupOpenChangeCallback>| {
+            callback.clone().map(|callback| {
+                let value = value.clone();
+                Rc::new(move |open: &bool, details: &ChangeDetails, window: &mut Window, cx: &mut App| {
+                    callback(open, details, value.as_ref(), window, cx)
+                }) as ChangeCallback<bool>
+            })
+        };
+        let [before_callback, callback] = self.inner.open_callbacks.borrow().clone();
         let before = self.is_open();
         let changed = {
             let instance = this.instance();
-            self.inner
-                .open
-                .borrow_mut()
-                .change(instance, open, change.options(), window, cx)
+            let mut key = self.inner.open.borrow_mut();
+            key.set_on_before_change(with_value(&before_callback));
+            key.set_on_change(with_value(&callback));
+            key.change(instance, open, change.options(), window, cx)
         };
-        *self.inner.return_value.borrow_mut() = None;
         if self.is_open() != before {
             self.open_changed(this, window, cx);
         }

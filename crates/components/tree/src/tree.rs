@@ -196,19 +196,21 @@ pub struct TreeLoadDetails {
 
 /// `on_action`: the item's value and what ran it. Return
 /// `ActionOutcome::Pending` with the work to mark the item pending until it
-/// settles. It runs inside the tree's update, so it may update any entity
-/// but the tree.
+/// settles. It runs inside the tree's update, since the tree reads what it
+/// returns, so it may update any entity but the tree.
 pub type TreeActionCallback =
     Rc<dyn Fn(&SharedString, &TreeActionDetails, &mut Window, &mut App) -> ActionOutcome>;
 
 /// `load_children`: loads a branch's children. `ActionOutcome::Done` when
 /// they're there now, `Pending` with the work that loads them, `Failed` when
-/// it couldn't start. It runs inside the tree's update.
+/// it couldn't start. It runs inside the tree's update, since the tree reads
+/// what it returns, so it may update any entity but the tree.
 pub type TreeLoadChildren =
     Rc<dyn Fn(&SharedString, &TreeLoadDetails, &mut Window, &mut App) -> ActionOutcome>;
 
 /// `on_highlight`: the item the keyboard moved focus to, and its row among
-/// the items that show. It runs inside the tree's update.
+/// the items that show. It runs once the tree's update is over, so it may
+/// update any entity, the tree too.
 pub type TreeHighlightCallback = Rc<dyn Fn(&SharedString, &ListHighlightDetails, &mut Window, &mut App)>;
 
 /// `announcement`: what screen readers hear for a change, or `None` for
@@ -249,10 +251,15 @@ pub struct TreeOptions {
     /// The branches expanded at first, when uncontrolled. The ancestors of
     /// `current` are added.
     pub default_expanded: Vec<SharedString>,
-    /// Runs when branches want to expand or collapse. `details.reason` is
-    /// `ItemPress`, `TriggerPress`, `ListNavigation` or `Imperative`, and
-    /// `details.cancel()` stops it. It runs inside the tree's update.
+    /// Runs when branches expand or collapse. `details.reason` is
+    /// `ItemPress`, `TriggerPress`, `ListNavigation` or `Imperative`. It runs
+    /// once the tree's update is over, so it may update any entity, the tree
+    /// too.
     pub on_expanded_change: Option<ChangeCallback<Vec<SharedString>>>,
+    /// Runs as branches are asked to expand or collapse, before they do,
+    /// inside the tree's update: `details.cancel()` stops it. It may update
+    /// any entity but the tree.
+    pub on_before_expanded_change: Option<ChangeCallback<Vec<SharedString>>>,
     /// Whether pressing a branch's row expands or collapses it. Its
     /// indicator always does. True by default.
     pub expand_on_press: bool,
@@ -266,10 +273,14 @@ pub struct TreeOptions {
     /// The items checked at first, when uncontrolled. A branch stands for
     /// everything in it.
     pub default_checked: Vec<SharedString>,
-    /// Runs when checkboxes want to change. `details.reason` is `ItemPress`
-    /// or `Imperative`, and `details.cancel()` stops it. It runs inside the
-    /// tree's update.
+    /// Runs when checkboxes change. `details.reason` is `ItemPress` or
+    /// `Imperative`. It runs once the tree's update is over, so it may update
+    /// any entity, the tree too.
     pub on_checked_change: Option<ChangeCallback<Vec<SharedString>>>,
+    /// Runs as checkboxes are asked to change, before they do, inside the
+    /// tree's update: `details.cancel()` stops it. It may update any entity
+    /// but the tree.
+    pub on_before_checked_change: Option<ChangeCallback<Vec<SharedString>>>,
     /// Which items the checked value lists: the checked leaves (`Leaf`, the
     /// default), the outermost fully checked items (`Trunk`), every fully
     /// checked item (`Branch`), or each item on its own with no cascading
@@ -277,7 +288,8 @@ pub struct TreeOptions {
     pub check_strategy: TreeCheckStrategy,
     /// Runs when an item is pressed or Enter is pressed on it, apart from
     /// selecting it, like opening a file. Pending work marks the item
-    /// pending until it settles.
+    /// pending until it settles. It runs inside the tree's update, since the
+    /// tree reads what it returns.
     pub on_action: Option<TreeActionCallback>,
     /// What screen readers hear once an item's action has been pending for a
     /// second, so a slow action doesn't pass in silence. Set it in the app's
@@ -338,11 +350,13 @@ impl Default for TreeOptions {
             expanded: None,
             default_expanded: Vec::new(),
             on_expanded_change: None,
+            on_before_expanded_change: None,
             expand_on_press: true,
             checkable: false,
             checked: None,
             default_checked: Vec::new(),
             on_checked_change: None,
+            on_before_checked_change: None,
             check_strategy: TreeCheckStrategy::Leaf,
             on_action: None,
             pending_announcement: None,
@@ -430,6 +444,14 @@ impl TreeOptions {
         self
     }
 
+    pub fn on_before_expanded_change(
+        mut self,
+        callback: impl Fn(&Vec<SharedString>, &ui_sdk_kernel::ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_expanded_change = Some(Rc::new(callback));
+        self
+    }
+
     pub fn expand_on_press(mut self, expand_on_press: bool) -> Self {
         self.expand_on_press = expand_on_press;
         self
@@ -455,6 +477,14 @@ impl TreeOptions {
         callback: impl Fn(&Vec<SharedString>, &ui_sdk_kernel::ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_checked_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_checked_change(
+        mut self,
+        callback: impl Fn(&Vec<SharedString>, &ui_sdk_kernel::ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_checked_change = Some(Rc::new(callback));
         self
     }
 

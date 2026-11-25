@@ -237,7 +237,8 @@ impl<T> ComboboxItemProps<T> {
 /// doesn't change the value by itself. Return `ActionOutcome::Pending` to
 /// mark the option pending until the work settles; the list closes (or the
 /// input empties, with `multiple`) once it succeeds. It runs inside the
-/// combobox's update, so it may update any entity but the combobox.
+/// combobox's update, since the combobox reads what it returns, so it may
+/// update any entity but the combobox.
 pub type CreateCallback = Rc<dyn Fn(&SharedString, &mut Window, &mut App) -> ActionOutcome>;
 
 /// Props of the create option (`ComboboxCreateProps`).
@@ -488,18 +489,27 @@ pub struct ComboboxOptions<T> {
     /// The input's text at first, when uncontrolled. Defaults to the selected
     /// item's label.
     pub default_query: Option<SharedString>,
-    /// Runs when the input's text wants to change: typing, choosing an item,
-    /// or closing with text that wasn't chosen.
+    /// Runs when the input's text changes: typing, choosing an item, or
+    /// closing with text that wasn't chosen. It runs once the combobox's
+    /// update is over, so it may update any entity, the combobox too.
     pub on_query_change: Option<ComboboxQueryCallback>,
+    /// Runs as the input's text is asked to change, before it does, inside
+    /// the combobox's update: `details.cancel()` keeps the text it had. It
+    /// may update any entity but the combobox.
+    pub on_before_query_change: Option<ComboboxQueryCallback>,
     /// Whether the list is open. Pass it to control it.
     pub open: Option<bool>,
     /// Whether the list starts open, when uncontrolled.
     pub default_open: bool,
-    /// Runs when the list wants to open or close. `details.cancel()` stops
-    /// it.
+    /// Runs when the list opens or closes, once the combobox's update is
+    /// over, so it may update any entity, the combobox too.
     pub on_open_change: Option<ComboboxOpenCallback>,
+    /// Runs as the list is asked to open or close, before it does, inside
+    /// the combobox's update: `details.cancel()` stops it. It may update any
+    /// entity but the combobox.
+    pub on_before_open_change: Option<ComboboxOpenCallback>,
     /// Runs once the list has finished opening or closing, after any
-    /// animation.
+    /// animation, once the combobox's update is over.
     pub on_open_change_complete: Option<Rc<dyn Fn(bool, &mut Window, &mut App)>>,
     /// With `multiple`, how many items can be selected. Once reached, the
     /// other items are disabled.
@@ -545,12 +555,12 @@ pub struct ComboboxOptions<T> {
     /// parts. Marks the list busy while loading. Defaults to `Idle`.
     pub status: AsyncOptionsStatus,
     /// Runs when the highlight moves, with the item's index among the
-    /// visible items, so a virtualized list can scroll to it. It runs inside
-    /// the combobox's update.
+    /// visible items, so a virtualized list can scroll to it. It runs once
+    /// the combobox's update is over.
     pub on_highlight: Option<Rc<dyn Fn(Option<&T>, &ListHighlightDetails, &mut Window, &mut App)>>,
     /// Runs when the highlight or scrolling reaches the last item, so the
     /// next page can load. Not again for the same items, unless the last
-    /// load failed.
+    /// load failed. It runs once the combobox's update is over.
     pub on_load_more: Option<Rc<dyn Fn(&mut Window, &mut App)>>,
     /// What screen readers hear after typing pauses, when no status part is
     /// rendered, and when a chip is removed. `None` says nothing. Defaults
@@ -586,7 +596,8 @@ pub struct ComboboxOptions<T> {
     /// Whether Escape, an outside press, focus or the window leaving, the
     /// back gesture and a swipe can close the list. Defaults to true.
     pub dismissible: bool,
-    /// Runs when `dismissible` refused a dismissal made on purpose.
+    /// Runs when `dismissible` refused a dismissal made on purpose, once the
+    /// combobox's update is over.
     pub on_dismiss_attempt: Option<Rc<dyn Fn(&DismissAttemptDetails, &mut Window, &mut App)>>,
     /// Logs every change with its reason, in development builds.
     pub debug: bool,
@@ -603,9 +614,11 @@ impl<T> Default for ComboboxOptions<T> {
             query: None,
             default_query: None,
             on_query_change: None,
+            on_before_query_change: None,
             open: None,
             default_open: false,
             on_open_change: None,
+            on_before_open_change: None,
             on_open_change_complete: None,
             max_selected: None,
             items: None,
@@ -651,9 +664,11 @@ impl<T: Clone> Clone for ComboboxOptions<T> {
             query: self.query.clone(),
             default_query: self.default_query.clone(),
             on_query_change: self.on_query_change.clone(),
+            on_before_query_change: self.on_before_query_change.clone(),
             open: self.open,
             default_open: self.default_open,
             on_open_change: self.on_open_change.clone(),
+            on_before_open_change: self.on_before_open_change.clone(),
             on_open_change_complete: self.on_open_change_complete.clone(),
             max_selected: self.max_selected,
             items: self.items.clone(),
@@ -738,6 +753,14 @@ impl<T: Clone + PartialEq + Debug + 'static> ComboboxOptions<T> {
         self
     }
 
+    pub fn on_before_query_change(
+        mut self,
+        callback: impl Fn(&SharedString, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_query_change = Some(Rc::new(callback));
+        self
+    }
+
     pub fn open(mut self, open: bool) -> Self {
         self.open = Some(open);
         self
@@ -750,6 +773,14 @@ impl<T: Clone + PartialEq + Debug + 'static> ComboboxOptions<T> {
 
     pub fn on_open_change(mut self, callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static) -> Self {
         self.on_open_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_open_change(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_open_change = Some(Rc::new(callback));
         self
     }
 

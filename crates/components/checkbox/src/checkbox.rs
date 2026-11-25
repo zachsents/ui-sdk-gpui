@@ -33,11 +33,14 @@ pub struct CheckboxOptions {
     /// Whether it's checked at first, when uncontrolled. A form reset returns
     /// to it.
     pub default_checked: Option<CheckedState>,
-    /// Runs when a user or a form reset wants to change it. `details.reason`
-    /// is `Press`, `Reset` or `Imperative`, and `details.cancel()` stops it. It
-    /// runs inside the checkbox's update, so it may update any entity but the
-    /// checkbox.
+    /// Runs when a user or a form reset changes it. `details.reason` is
+    /// `Press`, `Reset` or `Imperative`. It runs once the checkbox's update is
+    /// over, so it may update any entity, the checkbox too.
     pub on_checked_change: Option<ChangeCallback<CheckedState>>,
+    /// Runs as it is asked to change, before it does, inside the checkbox's
+    /// update: `details.cancel()` stops it. It may update any entity but the
+    /// checkbox.
+    pub on_before_checked_change: Option<ChangeCallback<CheckedState>>,
     /// Disables it like a native control: it can't be focused or changed, and
     /// isn't submitted.
     pub disabled: bool,
@@ -82,6 +85,14 @@ impl CheckboxOptions {
         callback: impl Fn(&CheckedState, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_checked_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_checked_change(
+        mut self,
+        callback: impl Fn(&CheckedState, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_checked_change = Some(Rc::new(callback));
         self
     }
 
@@ -277,6 +288,7 @@ fn toggle_options(options: &CheckboxOptions, cx: &App) -> ToggleOptions {
         checked: options.checked,
         default_checked: options.default_checked,
         on_checked_change: options.on_checked_change.clone(),
+        on_before_checked_change: options.on_before_checked_change.clone(),
         disabled: options.disabled,
         read_only: options.read_only,
         required: options.required,

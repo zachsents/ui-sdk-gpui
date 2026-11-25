@@ -419,8 +419,10 @@ fn split<P: Clone + PartialEq + Debug + 'static>(options: AlertDialogOptions<P>)
         open: options.open,
         default_open: options.default_open,
         on_open_change: options.on_open_change,
+        on_before_open_change: options.on_before_open_change,
         on_open_change_complete: options.on_open_change_complete,
         on_payload_change: options.on_payload_change,
+        on_before_payload_change: options.on_before_payload_change,
         dismissible: options.dismissible,
         on_dismiss_attempt: options.on_dismiss_attempt,
         ..PopupOptions::default()

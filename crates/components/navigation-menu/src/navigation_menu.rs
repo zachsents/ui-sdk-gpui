@@ -89,7 +89,8 @@ pub struct NavigationMenuOptions {
     /// update any entity but the menu.
     pub on_before_value_change: Option<ChangeCallback<Option<SharedString>>>,
     /// Runs once the menu has finished opening or closing, after any
-    /// animation. Switching items doesn't count.
+    /// animation, once the menu's update is over. Switching items doesn't
+    /// count.
     pub on_open_change_complete: Option<OpenChangeCompleteCallback>,
     /// How long the pointer rests on a trigger before its panel opens.
     /// Moving to another trigger while one is open switches at once. 50 ms

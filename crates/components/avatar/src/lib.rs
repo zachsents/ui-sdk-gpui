@@ -40,9 +40,9 @@
 //! - `details.event` is always `None`: gpui's `img` has no `load` or `error`
 //!   event.
 //! - The parts show a new status a frame before `with` and `state()` do,
-//!   which read the one that stands, and a status `details.cancel()` refuses
-//!   goes back a frame after it showed. The original's store has it before
-//!   anything renders.
+//!   which read the one that stands, and a status that
+//!   `on_before_loading_status_change` refuses goes back a frame after it
+//!   showed. The original's store has it before anything renders.
 //! - The image part is a div holding `img`, which fills it, where the
 //!   original's `<img>` is the part. Size the part, and round it to round the
 //!   image, since gpui clips nothing to rounded corners. `alt` is the part's

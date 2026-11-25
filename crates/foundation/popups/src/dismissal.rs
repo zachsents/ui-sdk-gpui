@@ -7,10 +7,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use gpui::{App, Context, Window};
-use ui_sdk_kernel::{DismissAttemptDetails, DismissAttemptReason, InputEvent, Reason, is_dismissal};
+use ui_sdk_kernel::{DismissAttemptDetails, DismissAttemptReason, InputEvent, Reason, after_update, is_dismissal};
 
-/// Hears a refused dismissal made on purpose. It runs inside the component's
-/// update, so it may update any entity but the component.
+/// Hears a refused dismissal made on purpose. It runs once the component's
+/// update is over, so it may update any entity, the component too.
 pub type DismissAttemptCallback = Rc<dyn Fn(&DismissAttemptDetails, &mut Window, &mut App)>;
 
 /// The options a dismissable layer takes (`DismissOptions`).
@@ -128,14 +128,11 @@ pub fn create_dismissal<T: 'static>(options: DismissOptions, rules: DismissRules
 fn attempt(options: &Rc<RefCell<DismissOptions>>, reason: DismissAttemptReason, event: Option<&InputEvent>, window: &mut Window, cx: &mut App) {
     let callback = options.borrow().on_dismiss_attempt.clone();
     if let Some(callback) = callback {
-        callback(
-            &DismissAttemptDetails {
-                reason,
-                event: event.cloned(),
-            },
-            window,
-            cx,
-        );
+        let details = DismissAttemptDetails {
+            reason,
+            event: event.cloned(),
+        };
+        after_update(window, cx, move |window, cx| callback(&details, window, cx));
     }
 }
 

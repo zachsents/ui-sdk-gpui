@@ -128,7 +128,8 @@ pub type WaterfallChangeOptions = ChangeOptions;
 pub type WaterfallBarLabelFn = Rc<dyn Fn(&WaterfallDataItem, &WaterfallBarLabelDetails) -> String>;
 
 /// `on_highlight`: the row the keyboard moved focus to, and its place among
-/// the rows that show. It runs inside the waterfall's update.
+/// the rows that show. It runs once the waterfall's update is over, so it
+/// may update any entity, the waterfall too.
 pub type WaterfallHighlightCallback = Rc<dyn Fn(&SharedString, &ListHighlightDetails, &mut Window, &mut App)>;
 
 /// The options `Waterfall` takes.
@@ -159,10 +160,15 @@ pub struct WaterfallOptions {
     pub expanded: Option<Vec<SharedString>>,
     /// The spans expanded at first, when uncontrolled.
     pub default_expanded: Vec<SharedString>,
-    /// Runs when spans want to expand or collapse. `details.reason` is
-    /// `TriggerPress`, `ListNavigation` or `Imperative`, and
-    /// `details.cancel()` stops it. It runs inside the waterfall's update.
+    /// Runs when spans expand or collapse. `details.reason` is
+    /// `TriggerPress`, `ListNavigation` or `Imperative`. It runs once the
+    /// waterfall's update is over, so it may update any entity, the
+    /// waterfall too.
     pub on_expanded_change: Option<ChangeCallback<Vec<SharedString>>>,
+    /// Runs as spans are asked to expand or collapse, before they do, inside
+    /// the waterfall's update: `details.cancel()` stops it. It may update any
+    /// entity but the waterfall.
+    pub on_before_expanded_change: Option<ChangeCallback<Vec<SharedString>>>,
     /// Runs when the keyboard moves focus to a row, with its place among the
     /// rows that show, from 0. A waterfall that renders only the rows in view
     /// scrolls that row into view here, so it can take focus once it renders.
@@ -237,6 +243,14 @@ impl WaterfallOptions {
         callback: impl Fn(&Vec<SharedString>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_expanded_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_expanded_change(
+        mut self,
+        callback: impl Fn(&Vec<SharedString>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_expanded_change = Some(Rc::new(callback));
         self
     }
 

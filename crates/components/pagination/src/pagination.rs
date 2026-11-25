@@ -36,14 +36,18 @@ pub struct PaginationOptions {
     pub page: Option<usize>,
     /// The page it starts on, when uncontrolled. 1 by default.
     pub default_page: Option<usize>,
-    /// Runs when the page wants to change: a page link (`ItemPress`), the
-    /// Previous, Next, First or Last part (`PreviousPress`, `NextPress`,
-    /// `FirstPress`, `LastPress`), or an api call (`Imperative`).
-    /// `details.cancel()` keeps the page, and stops a link from navigating:
-    /// the press calls `window.prevent_default()`, which an app's own click
-    /// handler on the part, like a router's, checks. It runs inside the
-    /// pagination's update, so it may update any entity but the pagination.
+    /// Runs when the page changes: a page link (`ItemPress`), the Previous,
+    /// Next, First or Last part (`PreviousPress`, `NextPress`, `FirstPress`,
+    /// `LastPress`), or an api call (`Imperative`). It runs once the
+    /// pagination's update is over, so it may update any entity, the pagination
+    /// too.
     pub on_page_change: Option<ChangeCallback<usize>>,
+    /// Runs as the page is asked to change, before it does, inside the
+    /// pagination's update: `details.cancel()` keeps the page, and stops a link
+    /// from navigating: the press calls `window.prevent_default()`, which an
+    /// app's own click handler on the part, like a router's, checks. It may
+    /// update any entity but the pagination.
+    pub on_before_page_change: Option<ChangeCallback<usize>>,
     /// How many pages there are. Or pass `total` and `page_size`.
     pub page_count: Option<usize>,
     /// How many items there are, for `page_count` from `page_size`.
@@ -82,6 +86,14 @@ impl PaginationOptions {
         callback: impl Fn(&usize, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_page_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_page_change(
+        mut self,
+        callback: impl Fn(&usize, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_page_change = Some(Rc::new(callback));
         self
     }
 
@@ -260,6 +272,7 @@ impl Pagination {
         let mut page = Controllable::new("page", first);
         page.set_controlled(options.page);
         page.set_on_change(options.on_page_change.clone());
+        page.set_on_before_change(options.on_before_page_change.clone());
         let mut instance = Instance::new("pagination").with_agent(cx);
         instance.debug = options.debug;
         let settings = settings(&options);
@@ -281,6 +294,7 @@ impl Pagination {
     pub fn set_options(&mut self, options: PaginationOptions, cx: &mut Context<Self>) {
         let mut changed = self.page.set_controlled(options.page);
         self.page.set_on_change(options.on_page_change.clone());
+        self.page.set_on_before_change(options.on_before_page_change.clone());
         let settings = settings(&options);
         // A `get_href` an app makes anew each render counts as the same.
         changed |= self.page_count != settings.page_count

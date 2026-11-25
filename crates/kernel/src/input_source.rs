@@ -54,3 +54,32 @@ pub fn dispatch<V: ?Sized>(
     }
     details.canceled()
 }
+
+/// `dispatch` for an event a component tells twice: `before` as it happens,
+/// inside the update, where `details.cancel()` stops it, and `after` once the
+/// update is over, when it went through. Returns whether it was canceled.
+pub fn dispatch_then<V: Clone + 'static>(
+    before: Option<&EventCallback<V>>,
+    after: Option<&EventCallback<V>>,
+    value: &V,
+    options: ChangeOptions,
+    window: &mut Window,
+    cx: &mut App,
+) -> bool {
+    let reason = options.reason.unwrap_or(Reason::Imperative);
+    let source = options
+        .source
+        .unwrap_or_else(|| change_source(reason, options.event.as_ref()));
+    let details = ChangeDetails::new(reason, source, options.event);
+    if let Some(callback) = before {
+        with_source(details.source, || callback(value, &details, window, cx));
+    }
+    if details.canceled() {
+        return true;
+    }
+    if let Some(callback) = after.cloned() {
+        let value = value.clone();
+        window.defer(cx, move |window, cx| with_source(details.source, || callback(&value, &details, window, cx)));
+    }
+    false
+}

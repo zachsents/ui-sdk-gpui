@@ -108,13 +108,18 @@ pub struct ResizableOptions {
     pub layout: Option<Vec<f64>>,
     /// The layout at first, when uncontrolled.
     pub default_layout: Option<Vec<f64>>,
-    /// Runs while the layout changes: on every frame of a drag and every
-    /// key. `details.reason` says why, and `details.cancel()` keeps the
-    /// layout. It runs inside the group's update, so it may update any
-    /// entity but the group.
+    /// Runs while the layout changes: on every frame of a drag and every key.
+    /// `details.reason` says why. It runs once the group's update is over, so
+    /// it may update any entity, the group too.
     pub on_layout_change: Option<ChangeCallback<Vec<f64>>>,
+    /// Runs as the layout is asked to change, before it does, inside the
+    /// group's update: `details.cancel()` keeps the layout. It may update any
+    /// entity but the group.
+    pub on_before_layout_change: Option<ChangeCallback<Vec<f64>>>,
     /// Runs once an interaction that changed the layout ends: the pointer
-    /// lifts, the key comes up, or a panel collapses. For saving.
+    /// lifts, the key comes up, or a panel collapses. For saving. It runs once
+    /// the group's update is over, so it may update any entity, the group
+    /// too.
     pub on_layout_commit: Option<CommitCallback<Vec<f64>>>,
     /// The direction panels are laid out in. Defaults to horizontal.
     pub orientation: ResizableOrientation,
@@ -144,6 +149,7 @@ impl Default for ResizableOptions {
             layout: None,
             default_layout: None,
             on_layout_change: None,
+            on_before_layout_change: None,
             on_layout_commit: None,
             orientation: ResizableOrientation::Horizontal,
             disabled: false,
@@ -172,6 +178,14 @@ impl ResizableOptions {
         callback: impl Fn(&Vec<f64>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_layout_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_layout_change(
+        mut self,
+        callback: impl Fn(&Vec<f64>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_layout_change = Some(Rc::new(callback));
         self
     }
 
@@ -348,6 +362,7 @@ impl Resizable {
             layout.set_controlled(Some(Vec::new()));
         }
         layout.set_on_change(options.on_layout_change.clone());
+        layout.set_on_before_change(options.on_before_layout_change.clone());
         layout.set_on_commit(options.on_layout_commit.clone());
         let mut instance = Instance::new("resizable").with_agent(cx);
         instance.debug = options.debug;
@@ -404,6 +419,7 @@ impl Resizable {
         let changed = self.settings != settings;
         self.settings = settings;
         self.layout.set_on_change(options.on_layout_change);
+        self.layout.set_on_before_change(options.on_before_layout_change);
         self.layout.set_on_commit(options.on_layout_commit);
         self.default_layout = options.default_layout;
         self.auto_save_id = options.auto_save_id;

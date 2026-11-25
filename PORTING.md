@@ -255,14 +255,14 @@ A `definePrimitive` definition becomes a struct held in an `Entity`:
   one can refuse go through `set_held` and `change::log`.
   Commits go through `Controllable::commit`, or `commit_value` for a value
   the app hasn't passed back yet.
-- **Callbacks run inside the component's update.** They get `&mut Window` and
-  `&mut App` and may update any entity but the component itself (gpui panics
-  on a reentrant update). Say so on callbacks apps use to control a value.
-  A `value` is the exception: its key is made with
-  `Controllable::new("value", ..).after_update()`, so `on_value_change` and
-  `on_value_commit` run once the update is over and may update anything, and
-  `on_before_value_change`, given with `set_on_before_change`, is the
-  callback inside the update that can `cancel()`.
+- **Callbacks run once the component's update is over.** They get
+  `&mut Window` and `&mut App` and may update any entity, the component too.
+  `Controllable` runs `on_change` and `on_commit` that way; a callback the
+  component calls itself goes through `after_update(window, cx, ..)`. A
+  change that can be refused gets an `on_before_*` callback, which runs inside
+  the update, before the change, and can `cancel()`: `set_on_before_change`
+  on a `Controllable`, `dispatch_then` for an event callback. Handlers whose
+  return value the component reads, like actions, run inside the update.
 - **Slots are part methods** returning a `Part<State>`:
   `pub fn root(this: &Entity<Self>, cx: &App) -> Part<ToggleState>`, and for a
   slot there are many of, the key too:

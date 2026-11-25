@@ -36,17 +36,14 @@ impl Example {
                     ])
                     .on_submit(move |value, _details, window, cx| {
                         let sent: SharedString = to_text(value, &default_codec()).into();
-                        let this = this.clone();
-                        window.defer(cx, move |window, cx| {
-                            this.update(cx, |example, cx| {
-                                example.sent = sent;
-                                example.prompt.update(cx, |input, cx| {
-                                    input.clear(ChangeOptions::default(), window, cx);
-                                });
-                                cx.notify();
-                            })
-                            .ok();
-                        });
+                        this.update(cx, |example, cx| {
+                            example.sent = sent;
+                            example.prompt.update(cx, |input, cx| {
+                                input.clear(ChangeOptions::default(), window, cx);
+                            });
+                            cx.notify();
+                        })
+                        .ok();
                     }),
                 window,
                 cx,

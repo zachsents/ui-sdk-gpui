@@ -109,8 +109,8 @@ impl RegionBinding {
 }
 
 impl ToastRegion {
-    /// Closes a toast for a reason, unless its `on_dismiss` cancels. Returns
-    /// whether it closed.
+    /// Closes a toast for a reason, unless its `on_before_dismiss` cancels.
+    /// Returns whether it closed.
     pub(crate) fn close_toast(
         &mut self,
         id: &str,

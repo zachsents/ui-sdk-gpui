@@ -178,8 +178,8 @@ pub struct TokenInputOptions {
     /// Runs on the submit shortcut, unless an input method is composing or a
     /// trigger menu took the key. Without it, the shortcut submits the form
     /// the input is in. With neither, the key is left alone, so Enter starts
-    /// a new line. It runs inside the input's update, so it may update any
-    /// entity but the input: clear it after sending with `window.defer`.
+    /// a new line. It runs once the input's update is over, so it may update
+    /// any entity, the input too, like clearing it once it's sent.
     pub on_submit: Option<TokenInputSubmit>,
     /// Which keys submit. Enter by default.
     pub submit_shortcut: TokenInputSubmitShortcut,
@@ -537,7 +537,7 @@ impl TokenInput {
             .value
             .as_ref()
             .map_or_else(|| initial.clone(), |value| passed.get(value));
-        let mut value = Controllable::new("value", current.clone()).after_update();
+        let mut value = Controllable::new("value", current.clone());
         value.set_controlled(options.value.is_some().then(|| current.clone()));
         let mut instance = Instance::new("token-input").with_agent(cx);
         Segment::register_data();

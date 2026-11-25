@@ -61,7 +61,8 @@ pub type Presentation = ui_sdk_popups::Presentation;
 /// Runs when an item is selected, with what selected it. Call
 /// `event.prevent_default()` to keep the menu open and skip `on_action`.
 /// Return `ActionOutcome::Pending` to mark the item pending until its work
-/// settles. It runs inside the menu's update, so it may update any entity
+/// settles. It runs inside the menu's update, since the menu reads what it
+/// returns and whether it prevented the default, so it may update any entity
 /// but the menu.
 pub type SelectCallback = Rc<dyn Fn(&SelectEvent, &mut Window, &mut App) -> ActionOutcome>;
 
@@ -315,11 +316,14 @@ pub struct CheckboxProps {
     pub checked: Option<bool>,
     /// Whether the item starts checked, when uncontrolled. Defaults to false.
     pub default_checked: bool,
-    /// Runs when the item wants to toggle, before the menu's
-    /// `on_checked_change`. `details.reason` is `ItemPress` or `Imperative`,
-    /// and `details.cancel()` stops it. It runs inside the menu's update, so
-    /// it may update any entity but the menu.
+    /// Runs when the item toggles, before the menu's `on_checked_change`.
+    /// `details.reason` is `ItemPress` or `Imperative`. It runs once the
+    /// menu's update is over, so it may update any entity, the menu too.
     pub on_checked_change: Option<ChangeCallback<bool>>,
+    /// Runs as the item is asked to toggle, before it does and before the
+    /// menu's `on_before_checked_change`, inside the menu's update:
+    /// `details.cancel()` stops it. It may update any entity but the menu.
+    pub on_before_checked_change: Option<ChangeCallback<bool>>,
     /// Whether toggling closes the menu. Defaults to false.
     pub close_on_select: bool,
 }
@@ -354,6 +358,14 @@ impl CheckboxProps {
         callback: impl Fn(&bool, &ui_sdk_kernel::ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_checked_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_checked_change(
+        mut self,
+        callback: impl Fn(&bool, &ui_sdk_kernel::ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_checked_change = Some(Rc::new(callback));
         self
     }
 
@@ -733,6 +745,7 @@ pub(crate) enum KeyFollowUp<P: Clone + PartialEq + Debug + 'static> {
 pub(crate) struct Shared<P: Clone + PartialEq + Debug + 'static> {
     pub(crate) on_action: Option<crate::menu::MenuActionCallback>,
     pub(crate) on_checked_change: Option<crate::menu::MenuCheckedChangeCallback>,
+    pub(crate) on_before_checked_change: Option<crate::menu::MenuCheckedChangeCallback>,
     pub(crate) on_value_change: Option<crate::menu::MenuValueChangeCallback>,
     pub(crate) on_before_value_change: Option<crate::menu::MenuValueChangeCallback>,
     pub(crate) pending_announcement: Option<SharedString>,
@@ -1470,9 +1483,9 @@ impl<P: Clone + PartialEq + Debug + 'static> Menu<P> {
             .or_else(|| props.and_then(|props| props.default_value))
     }
 
-    /// Toggles a checkbox item. Its own callback hears first, then the root
-    /// menu's, and either can cancel (`setCheckbox`). Returns false when
-    /// canceled.
+    /// Toggles a checkbox item. Its own callbacks hear first, then the root
+    /// menu's, and either `on_before_checked_change` can cancel
+    /// (`setCheckbox`). Returns false when canceled.
     pub fn set_checkbox(
         &mut self,
         value: &SharedString,
@@ -1485,15 +1498,19 @@ impl<P: Clone + PartialEq + Debug + 'static> Menu<P> {
         let next = !self.checkbox_value(value, props);
         let source = change_source(reason, event.as_ref());
         let details = ui_sdk_kernel::ChangeDetails::new(reason, source, event.clone());
-        if let Some(callback) = props.on_checked_change.clone() {
+        if let Some(callback) = props.on_before_checked_change.clone() {
             with_source(source, || callback(&next, &details, window, cx));
         }
         if details.canceled() {
             return false;
         }
         let shared = ui_sdk_kernel::ChangeDetails::new(reason, source, event);
-        let callback = self.shared.root().settings.borrow().on_checked_change.clone();
-        if let Some(callback) = callback {
+        let root = self.shared.root();
+        let (before, after) = {
+            let settings = root.settings.borrow();
+            (settings.on_before_checked_change.clone(), settings.on_checked_change.clone())
+        };
+        if let Some(callback) = before {
             let details = crate::menu::MenuCheckedChangeDetails::new(&shared, value.clone());
             with_source(source, || callback(&next, &details, window, cx));
         }
@@ -1504,6 +1521,19 @@ impl<P: Clone + PartialEq + Debug + 'static> Menu<P> {
             self.checked.insert(value.clone(), next);
             cx.notify();
         }
+        // The item's and the menu's `on_checked_change` hear it once the
+        // update is over.
+        let item_callback = props.on_checked_change.clone();
+        let value = value.clone();
+        window.defer(cx, move |window, cx| {
+            if let Some(callback) = item_callback {
+                with_source(source, || callback(&next, &details, window, cx));
+            }
+            if let Some(callback) = after {
+                let details = crate::menu::MenuCheckedChangeDetails::new(&shared, value);
+                with_source(source, || callback(&next, &details, window, cx));
+            }
+        });
         true
     }
 

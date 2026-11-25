@@ -37,8 +37,9 @@
 //! - An outlet is a part rendered anywhere in the window. The sheet notifies
 //!   the drawer as it moves, which renders the window again, so the outlet's
 //!   state follows it.
-//! - The snap point and `on_snap_point_change` are a kernel `Controllable`;
-//!   a controlled `null` is `Some(None)`.
+//! - The snap point, `on_snap_point_change` and
+//!   `on_before_snap_point_change` are a kernel `Controllable`; a controlled
+//!   `null` is `Some(None)`.
 //!
 //! # Dropped, and why
 //!

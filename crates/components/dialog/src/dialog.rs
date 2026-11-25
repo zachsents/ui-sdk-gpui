@@ -47,10 +47,12 @@ pub type DialogDismissReason = DismissAttemptReason;
 /// (`DialogDismissAttemptDetails`).
 pub type DialogDismissAttemptDetails = DismissAttemptDetails;
 
-/// Hears a dialog asking to open or close: the requested `open`, the
-/// details, and what closed it, a Close part's `value` or `close`'s own
-/// (`DialogOpenChangeDetails`' `returnValue`). It runs inside the dialog's
-/// update, so it may update any entity but the dialog.
+/// Hears a dialog open or close: the requested `open`, the details, and
+/// what closed it, a Close part's `value` or `close`'s own
+/// (`DialogOpenChangeDetails`' `returnValue`). As `on_open_change`, it runs
+/// once the dialog's update is over, so it may update any entity, the dialog
+/// too; as `on_before_open_change`, it runs inside the update, before the
+/// dialog opens or closes, where `details.cancel()` stops it.
 pub type DialogOpenChangeCallback = PopupOpenChangeCallback;
 
 /// Where focus goes when the dialog opens (`DialogInitialFocus`). `Auto`
@@ -72,7 +74,8 @@ pub type DialogCloseActionDetails = ActionDetails;
 
 /// A Close part's `action`: it runs when the part is pressed, before the
 /// dialog closes, with the press and how it was pressed. It runs inside the
-/// dialog's update, so it may update any entity but the dialog. Work that
+/// dialog's update, since the dialog reads what it returns, so it may update
+/// any entity but the dialog. Work that
 /// goes on ([`ActionOutcome::wait`]) keeps the dialog open while it runs: the
 /// part is pending, screen readers hear the dialog's `pending_announcement`
 /// after a second, and nothing but its api closes the dialog. It
@@ -168,23 +171,31 @@ pub struct DialogOptions<P> {
     /// Whether the dialog starts open, when uncontrolled. Focus moves into
     /// it once it's in the page.
     pub default_open: bool,
-    /// Runs when the dialog wants to open or close. `details.reason` says
-    /// why: `TriggerPress`, `ClosePress`, `OutsidePress`, `EscapeKey`,
-    /// `ParentClose`, `Back`, `Action`, `Shortcut`, `Swipe` or `Imperative`.
-    /// `details.cancel()` stops it, and the return value carries what closed
-    /// it. It runs inside the dialog's update, so it may update any entity
-    /// but the dialog.
+    /// Runs when the dialog opens or closes. `details.reason` says why:
+    /// `TriggerPress`, `ClosePress`, `OutsidePress`, `EscapeKey`,
+    /// `ParentClose`, `Back`, `Action`, `Shortcut`, `Swipe` or `Imperative`,
+    /// and the return value carries what closed it. It runs once the
+    /// dialog's update is over, so it may update any entity, the dialog too.
     pub on_open_change: Option<DialogOpenChangeCallback>,
+    /// Runs as the dialog is asked to open or close, before it does, inside
+    /// the dialog's update: `details.cancel()` stops it. It hears the same
+    /// reasons and return value as `on_open_change`. It may update any
+    /// entity but the dialog.
+    pub on_before_open_change: Option<DialogOpenChangeCallback>,
     /// Runs once the dialog has finished opening or closing, after any
-    /// animation.
+    /// animation, once the dialog's update is over.
     pub on_open_change_complete: Option<OpenChangeCompleteCallback>,
     /// Runs when the payload the content shows changes: a trigger with
     /// another payload opens the dialog, or takes a non-modal dialog over
     /// while it's open, which fires no `on_open_change`, and so does
     /// `open(payload)` on the open dialog. `details.reason` is
-    /// `TriggerPress`, `Shortcut` or `Imperative`; `details.cancel()` keeps
-    /// the previous payload.
+    /// `TriggerPress`, `Shortcut` or `Imperative`. It runs once the dialog's
+    /// update is over.
     pub on_payload_change: Option<ChangeCallback<Option<P>>>,
+    /// Runs as the payload is asked to change, before it does, inside the
+    /// dialog's update: `details.cancel()` keeps the previous payload. It
+    /// may update any entity but the dialog.
+    pub on_before_payload_change: Option<ChangeCallback<Option<P>>>,
     /// Whether Escape, an outside press and the back gesture can close the
     /// dialog. Close parts, triggers and the api always can. Pass `false`
     /// while a form has unsaved changes, and ask in `on_dismiss_attempt`.
@@ -192,7 +203,8 @@ pub struct DialogOptions<P> {
     pub dismissible: bool,
     /// Runs when a dismissal was refused, because `dismissible` is false, an
     /// outside press doesn't close it, or a Close part's action is running.
-    /// Ask "Discard changes?" here.
+    /// Ask "Discard changes?" here. It runs once the dialog's update is
+    /// over.
     pub on_dismiss_attempt: Option<DismissAttemptCallback>,
     /// Regions that stay usable while the dialog blocks the window, like a
     /// chat launcher, read when it opens. Presses on them never close it.
@@ -227,8 +239,10 @@ impl<P> Default for DialogOptions<P> {
             open: None,
             default_open: false,
             on_open_change: None,
+            on_before_open_change: None,
             on_open_change_complete: None,
             on_payload_change: None,
+            on_before_payload_change: None,
             dismissible: true,
             on_dismiss_attempt: None,
             persistent_elements: None,
@@ -247,8 +261,10 @@ impl<P> Clone for DialogOptions<P> {
             open: self.open,
             default_open: self.default_open,
             on_open_change: self.on_open_change.clone(),
+            on_before_open_change: self.on_before_open_change.clone(),
             on_open_change_complete: self.on_open_change_complete.clone(),
             on_payload_change: self.on_payload_change.clone(),
+            on_before_payload_change: self.on_before_payload_change.clone(),
             dismissible: self.dismissible,
             on_dismiss_attempt: self.on_dismiss_attempt.clone(),
             persistent_elements: self.persistent_elements.clone(),
@@ -288,6 +304,26 @@ impl<P> DialogOptions<P> {
         self
     }
 
+    /// `on_before_open_change`, for a callback that doesn't read what
+    /// closes it.
+    pub fn on_before_open_change(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_open_change =
+            Some(Rc::new(move |open, details, _, window, cx| callback(open, details, window, cx)));
+        self
+    }
+
+    /// `on_before_open_change` with what closes it.
+    pub fn on_before_open_change_with_value(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, Option<&SharedString>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_open_change = Some(Rc::new(callback));
+        self
+    }
+
     pub fn on_open_change_complete(mut self, callback: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self {
         self.on_open_change_complete = Some(Rc::new(callback));
         self
@@ -298,6 +334,14 @@ impl<P> DialogOptions<P> {
         callback: impl Fn(&Option<P>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_payload_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_payload_change(
+        mut self,
+        callback: impl Fn(&Option<P>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_payload_change = Some(Rc::new(callback));
         self
     }
 
@@ -362,8 +406,10 @@ impl<P> DialogOptions<P> {
             open: self.open,
             default_open: self.default_open,
             on_open_change: self.on_open_change,
+            on_before_open_change: self.on_before_open_change,
             on_open_change_complete: self.on_open_change_complete,
             on_payload_change: self.on_payload_change,
+            on_before_payload_change: self.on_before_payload_change,
             modal: Some(self.modal),
             presentation: Some(self.presentation),
             dismissible: self.dismissible,
@@ -392,24 +438,34 @@ pub struct AlertDialogOptions<P: Clone + PartialEq + Debug + 'static> {
     pub open: Option<bool>,
     /// Whether it starts open, when uncontrolled.
     pub default_open: bool,
-    /// Runs when it wants to open or close. `details.reason` is
-    /// `TriggerPress`, `ClosePress`, `EscapeKey`, `ParentClose`, `Back`,
-    /// `Action`, `Shortcut` or `Imperative`; `details.cancel()` stops it, and
-    /// the return value is the `value` of the Close part that closed it. It
-    /// runs inside the alert dialog's update, so it may update any entity but
-    /// the alert dialog.
+    /// Runs when it opens or closes. `details.reason` is `TriggerPress`,
+    /// `ClosePress`, `EscapeKey`, `ParentClose`, `Back`, `Action`, `Shortcut`
+    /// or `Imperative`, and the return value is the `value` of the Close part
+    /// that closed it. It runs once the alert dialog's update is over, so it
+    /// may update any entity, the alert dialog too.
     pub on_open_change: Option<AlertDialogOpenChangeCallback>,
-    /// Runs once it has finished opening or closing, after any animation.
+    /// Runs as it's asked to open or close, before it does, inside the alert
+    /// dialog's update: `details.cancel()` stops it. It hears the same
+    /// reasons and return value as `on_open_change`. It may update any
+    /// entity but the alert dialog.
+    pub on_before_open_change: Option<AlertDialogOpenChangeCallback>,
+    /// Runs once it has finished opening or closing, after any animation,
+    /// once the alert dialog's update is over.
     pub on_open_change_complete: Option<OpenChangeCompleteCallback>,
     /// Runs when a trigger or `open()` with another payload opens it, before
     /// `on_open_change`, or `open(payload)` gives the open one another
     /// payload. `details.reason` is `TriggerPress`, `Shortcut` or
-    /// `Imperative`; `details.cancel()` keeps the previous payload.
+    /// `Imperative`. It runs once the alert dialog's update is over.
     pub on_payload_change: Option<ChangeCallback<Option<P>>>,
+    /// Runs as the payload is asked to change, before it does, inside the
+    /// alert dialog's update: `details.cancel()` keeps the previous payload.
+    /// It may update any entity but the alert dialog.
+    pub on_before_payload_change: Option<ChangeCallback<Option<P>>>,
     /// Whether Escape and the back gesture can close it. Defaults to true.
     pub dismissible: bool,
     /// Runs when a dismissal was refused, because `dismissible` is false or
-    /// a Close part's action is running.
+    /// a Close part's action is running, once the alert dialog's update is
+    /// over.
     pub on_dismiss_attempt: Option<DismissAttemptCallback>,
     /// Regions that stay usable while it blocks the window.
     pub persistent_elements: Option<PersistentElements>,
@@ -429,8 +485,10 @@ impl<P: Clone + PartialEq + Debug + 'static> Default for AlertDialogOptions<P> {
             open: None,
             default_open: false,
             on_open_change: None,
+            on_before_open_change: None,
             on_open_change_complete: None,
             on_payload_change: None,
+            on_before_payload_change: None,
             dismissible: true,
             on_dismiss_attempt: None,
             persistent_elements: None,
@@ -447,8 +505,10 @@ impl<P: Clone + PartialEq + Debug + 'static> Clone for AlertDialogOptions<P> {
             open: self.open,
             default_open: self.default_open,
             on_open_change: self.on_open_change.clone(),
+            on_before_open_change: self.on_before_open_change.clone(),
             on_open_change_complete: self.on_open_change_complete.clone(),
             on_payload_change: self.on_payload_change.clone(),
+            on_before_payload_change: self.on_before_payload_change.clone(),
             dismissible: self.dismissible,
             on_dismiss_attempt: self.on_dismiss_attempt.clone(),
             persistent_elements: self.persistent_elements.clone(),
@@ -485,6 +545,26 @@ impl<P: Clone + PartialEq + Debug + 'static> AlertDialogOptions<P> {
         self
     }
 
+    /// `on_before_open_change`, for a callback that doesn't read what
+    /// closes it.
+    pub fn on_before_open_change(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_open_change =
+            Some(Rc::new(move |open, details, _, window, cx| callback(open, details, window, cx)));
+        self
+    }
+
+    /// `on_before_open_change` with what closes it.
+    pub fn on_before_open_change_with_value(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, Option<&SharedString>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_open_change = Some(Rc::new(callback));
+        self
+    }
+
     pub fn on_open_change_complete(mut self, callback: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self {
         self.on_open_change_complete = Some(Rc::new(callback));
         self
@@ -495,6 +575,14 @@ impl<P: Clone + PartialEq + Debug + 'static> AlertDialogOptions<P> {
         callback: impl Fn(&Option<P>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_payload_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_payload_change(
+        mut self,
+        callback: impl Fn(&Option<P>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_payload_change = Some(Rc::new(callback));
         self
     }
 

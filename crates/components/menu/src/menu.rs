@@ -73,12 +73,14 @@ pub struct MenuActionDetails {
 /// settles: the item is `pending`, busy and disabled, the menu stays open,
 /// and choosing it again waits. It closes once the work succeeds; a failure
 /// keeps it open with the reason in the item's `error` state until the next
-/// try. `Canceled` keeps the menu open. It runs inside the menu's update, so
-/// it may update any entity but the menu.
+/// try. `Canceled` keeps the menu open. It runs inside the menu's update,
+/// since the menu reads what it returns, so it may update any entity but the
+/// menu.
 pub type MenuActionCallback = Rc<dyn Fn(&SharedString, &MenuActionDetails, &mut Window, &mut App) -> ActionOutcome>;
 
-/// What a menu's `on_checked_change` receives besides the new state: the
-/// change's details, with `cancel()`, and which item changed.
+/// What a menu's `on_checked_change` and `on_before_checked_change` receive
+/// besides the new state: the change's details, with `cancel()`, and which
+/// item changed.
 pub struct MenuCheckedChangeDetails<'a> {
     details: &'a ChangeDetails,
     /// The checkbox item's value.
@@ -151,10 +153,12 @@ impl Debug for MenuValueChangeDetails<'_> {
     }
 }
 
-/// `on_checked_change`: the new state and which item changed.
+/// `on_checked_change` and `on_before_checked_change`: the new state and
+/// which item changed.
 pub type MenuCheckedChangeCallback = Rc<dyn Fn(&bool, &MenuCheckedChangeDetails<'_>, &mut Window, &mut App)>;
 
-/// `on_value_change`: the new value and which group changed.
+/// `on_value_change` and `on_before_value_change`: the new value and which
+/// group changed.
 pub type MenuValueChangeCallback = Rc<dyn Fn(&SharedString, &MenuValueChangeDetails<'_>, &mut Window, &mut App)>;
 
 /// Menus as data: entries, and plain strings for items whose value and
@@ -422,27 +426,35 @@ impl From<MenuModal> for Modal {
 }
 
 /// The options `Menu` takes (`MenuOptions`). A submenu takes `open`,
-/// `default_open`, `on_open_change`, `on_open_change_complete`, `loop`,
-/// `delay`, `controller` and `debug`, with its parent in `parent`.
+/// `default_open`, `on_open_change`, `on_before_open_change`,
+/// `on_open_change_complete`, `loop`, `delay`, `controller` and `debug`, with
+/// its parent in `parent`.
 pub struct MenuOptions<P: Clone + PartialEq + Debug + 'static = ()> {
     /// Whether the menu is open. Pass it to control the menu.
     pub open: Option<bool>,
     /// Whether the menu starts open, when uncontrolled. Defaults to false.
     pub default_open: bool,
-    /// Runs when the menu wants to open or close, with what closed it.
-    /// `details.reason` says why (see [`MenuOpenChangeReason`]), and
-    /// `details.cancel()` stops it. It runs inside the menu's update, so it
-    /// may update any entity but the menu.
+    /// Runs when the menu opens or closes, with what closed it.
+    /// `details.reason` says why (see [`MenuOpenChangeReason`]). It runs once
+    /// the menu's update is over, so it may update any entity, the menu too.
     pub on_open_change: Option<PopupOpenChangeCallback>,
+    /// Runs as the menu is asked to open or close, before it does, inside the
+    /// menu's update, with what closed it: `details.cancel()` stops it. It
+    /// may update any entity but the menu.
+    pub on_before_open_change: Option<PopupOpenChangeCallback>,
     /// Runs once the menu has finished opening or closing, after any
     /// animation.
     pub on_open_change_complete: Option<OpenChangeCompleteCallback>,
     /// Runs when the payload the content shows changes: a trigger or context
     /// area with another payload opens the menu, or takes the open menu over,
     /// which fires no `on_open_change`, and so does a controller's
-    /// `open(payload)` on the open menu. `details.cancel()` keeps the
-    /// previous payload.
+    /// `open(payload)` on the open menu. It runs once the menu's update is
+    /// over, so it may update any entity, the menu too.
     pub on_payload_change: Option<ChangeCallback<Option<P>>>,
+    /// Runs as the payload is asked to change, before it does, inside the
+    /// menu's update: `details.cancel()` keeps the previous payload. It may
+    /// update any entity but the menu.
+    pub on_before_payload_change: Option<ChangeCallback<Option<P>>>,
     /// Runs for every plain item with a value, including items in submenus
     /// (see [`MenuActionCallback`]).
     pub on_action: Option<MenuActionCallback>,
@@ -451,8 +463,14 @@ pub struct MenuOptions<P: Clone + PartialEq + Debug + 'static = ()> {
     /// language. Empty says nothing. Defaults to "Loading".
     pub pending_announcement: Option<SharedString>,
     /// Runs when any checkbox item in the menu or its submenus toggles, with
-    /// the item's value in `details.value`. Made for data menus.
+    /// the item's value in `details.value`. Made for data menus. It runs once
+    /// the menu's update is over, so it may update any entity, the menu too.
     pub on_checked_change: Option<MenuCheckedChangeCallback>,
+    /// Runs as any checkbox item in the menu or its submenus is asked to
+    /// toggle, before it does, inside the menu's update, with the item's
+    /// value in `details.value`: `details.cancel()` stops it. It may update
+    /// any entity but the menu.
+    pub on_before_checked_change: Option<MenuCheckedChangeCallback>,
     /// Runs when any radio group in the menu or its submenus changes, with
     /// the group in `details.group`. Made for data menus. It runs once the
     /// menu's update is over, so it may update any entity, the menu too.
@@ -492,7 +510,7 @@ pub struct MenuOptions<P: Clone + PartialEq + Debug + 'static = ()> {
     /// controller always can. Defaults to true.
     pub dismissible: bool,
     /// Runs when `dismissible` refused a dismissal made on purpose (see
-    /// [`MenuDismissReason`]).
+    /// [`MenuDismissReason`]), once the menu's update is over.
     pub on_dismiss_attempt: Option<DismissAttemptCallback>,
     /// Logs every change with its reason, in development builds.
     pub debug: bool,
@@ -509,11 +527,14 @@ impl<P: Clone + PartialEq + Debug + 'static> Default for MenuOptions<P> {
             open: None,
             default_open: false,
             on_open_change: None,
+            on_before_open_change: None,
             on_open_change_complete: None,
             on_payload_change: None,
+            on_before_payload_change: None,
             on_action: None,
             pending_announcement: None,
             on_checked_change: None,
+            on_before_checked_change: None,
             on_value_change: None,
             on_before_value_change: None,
             items: None,
@@ -538,11 +559,14 @@ impl<P: Clone + PartialEq + Debug + 'static> Clone for MenuOptions<P> {
             open: self.open,
             default_open: self.default_open,
             on_open_change: self.on_open_change.clone(),
+            on_before_open_change: self.on_before_open_change.clone(),
             on_open_change_complete: self.on_open_change_complete.clone(),
             on_payload_change: self.on_payload_change.clone(),
+            on_before_payload_change: self.on_before_payload_change.clone(),
             on_action: self.on_action.clone(),
             pending_announcement: self.pending_announcement.clone(),
             on_checked_change: self.on_checked_change.clone(),
+            on_before_checked_change: self.on_before_checked_change.clone(),
             on_value_change: self.on_value_change.clone(),
             on_before_value_change: self.on_before_value_change.clone(),
             items: self.items.clone(),
@@ -590,6 +614,28 @@ impl<P: Clone + PartialEq + Debug + 'static> MenuOptions<P> {
         self
     }
 
+    /// `on_before_open_change`, for a callback that doesn't read what closes
+    /// it.
+    pub fn on_before_open_change(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_open_change = Some(Rc::new(move |open, details, _, window, cx| {
+            callback(open, details, window, cx)
+        }));
+        self
+    }
+
+    /// `on_before_open_change` with what closes it, like a controller's
+    /// `close` return value.
+    pub fn on_before_open_change_with_value(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, Option<&SharedString>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_open_change = Some(Rc::new(callback));
+        self
+    }
+
     pub fn on_open_change_complete(mut self, callback: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self {
         self.on_open_change_complete = Some(Rc::new(callback));
         self
@@ -600,6 +646,14 @@ impl<P: Clone + PartialEq + Debug + 'static> MenuOptions<P> {
         callback: impl Fn(&Option<P>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_payload_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_payload_change(
+        mut self,
+        callback: impl Fn(&Option<P>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_payload_change = Some(Rc::new(callback));
         self
     }
 
@@ -621,6 +675,14 @@ impl<P: Clone + PartialEq + Debug + 'static> MenuOptions<P> {
         callback: impl Fn(&bool, &MenuCheckedChangeDetails<'_>, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_checked_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_checked_change(
+        mut self,
+        callback: impl Fn(&bool, &MenuCheckedChangeDetails<'_>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_checked_change = Some(Rc::new(callback));
         self
     }
 
@@ -711,8 +773,10 @@ impl<P: Clone + PartialEq + Debug + 'static> MenuOptions<P> {
             open: self.open,
             default_open: self.default_open,
             on_open_change: self.on_open_change.clone(),
+            on_before_open_change: self.on_before_open_change.clone(),
             on_open_change_complete: self.on_open_change_complete.clone(),
             on_payload_change: self.on_payload_change.clone(),
+            on_before_payload_change: self.on_before_payload_change.clone(),
             modal: None,
             presentation: Some(self.presentation),
             open_on_hover: false,
@@ -729,6 +793,7 @@ impl<P: Clone + PartialEq + Debug + 'static> MenuOptions<P> {
         Shared {
             on_action: self.on_action.clone(),
             on_checked_change: self.on_checked_change.clone(),
+            on_before_checked_change: self.on_before_checked_change.clone(),
             on_value_change: self.on_value_change.clone(),
             on_before_value_change: self.on_before_value_change.clone(),
             pending_announcement: self.pending_announcement.clone(),

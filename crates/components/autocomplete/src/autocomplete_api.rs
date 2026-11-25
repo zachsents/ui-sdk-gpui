@@ -24,12 +24,13 @@ use ui_sdk_forms::{
 use ui_sdk_kernel::modality::{ModalityTracker, modality_of, restore_focus, track_input, track_modality, window_source};
 use ui_sdk_kernel::{
     ChangeCallback, ChangeOptions, Controllable, InputEvent, Instance, Key, Reason, flag_while_bound, focus_events,
-    name_of, press_of, with_source,
+    after_update, name_of, press_of, with_source,
 };
 use ui_sdk_lists::{
     AsyncOptionsStatus, AutoHighlight, AutocompleteCore, AutocompleteCoreConfig, AutocompleteCoreState, FieldName,
     HighlightCause, HighlightOptions, ItemIconsFeature, ItemTexts, ListData, ListEdge, ListEntry,
-    ListHighlightDetails, ListScroller, ListSettled, ListboxEngine, create_autocomplete_core, highlight_from_code,
+    ListHighlightDetails, ListScroller, ListSettled, ListboxEngine, LoadMoreFn, create_autocomplete_core,
+    highlight_from_code,
     highlighted_value, item_icons_feature, list_content_config, list_key_down, opens_into_list, option_icon,
 };
 use ui_sdk_motion::SheetSnapReason;
@@ -170,6 +171,9 @@ fn popup_options(options: &AutocompleteOptions) -> PopupOptions<()> {
     if let Some(callback) = options.on_open_change.clone() {
         popup = popup.on_open_change(move |open, details, window, cx| callback(open, details, window, cx));
     }
+    if let Some(callback) = options.on_before_open_change.clone() {
+        popup = popup.on_before_open_change(move |open, details, window, cx| callback(open, details, window, cx));
+    }
     popup.on_open_change_complete = options.on_open_change_complete.clone();
     popup.modal = options.modal;
     popup.presentation = options.presentation;
@@ -245,7 +249,7 @@ impl Autocomplete {
             .or_else(|| options.default_value.clone())
             .unwrap_or_default();
         let chosen: Rc<RefCell<Option<AutocompleteChosen>>> = Rc::default();
-        let mut value = Controllable::new("value", starting.clone()).after_update();
+        let mut value = Controllable::new("value", starting.clone());
         value.set_controlled(options.value.clone());
         value.set_on_change(value_callback(&options, None));
         value.set_on_before_change(before_callback(&options, &chosen));
@@ -396,7 +400,16 @@ impl Autocomplete {
             scroll_root: Some(Rc::new(|this: &Self| Some(this.scroller.clone()))),
             settles_mount: None,
             r#loop: Some(Rc::new(|this: &Self| this.options.r#loop)),
-            on_load_more: Some(Rc::new(|this: &Self| this.options.on_load_more.clone())),
+            // The app's `on_load_more` runs once the autocomplete's update is
+            // over.
+            on_load_more: Some(Rc::new(|this: &Self| {
+                this.options.on_load_more.clone().map(|load| {
+                    Rc::new(move |window: &mut Window, cx: &mut App| {
+                        let load = load.clone();
+                        after_update(window, cx, move |window, cx| load(window, cx));
+                    }) as LoadMoreFn
+                })
+            })),
             announcement: Some(Rc::new(|this: &Self| this.options.announcement.clone())),
             silent: Some(Rc::new(|this: &Self| flag_while_bound(&this.instance, "status") == Some(true))),
         }
@@ -1051,7 +1064,8 @@ impl Autocomplete {
             index,
             event: event.cloned(),
         };
-        on_highlight(key, &details, window, cx);
+        let key = key.cloned();
+        after_update(window, cx, move |window, cx| on_highlight(key.as_ref(), &details, window, cx));
     }
 
     // A value from outside, like a controlled one or the api, also becomes

@@ -49,8 +49,8 @@
 //!   them, so a value set before they first render keeps the order it was
 //!   given in.
 //! - A toggle reads its group as it renders and as its api runs, so a
-//!   group's `on_value_change` runs while the toggle that was pressed and
-//!   the group are both being updated, and may update neither.
+//!   group's `on_before_value_change` runs while the toggle that was pressed
+//!   and the group are both being updated, and may update neither.
 
 pub mod toggle;
 pub mod toggle_group;

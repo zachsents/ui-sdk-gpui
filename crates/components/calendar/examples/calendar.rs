@@ -178,9 +178,8 @@ fn calendar(entity: &Entity<Calendar>, selects: Option<Div>, cx: &App) -> impl I
 }
 
 // What a select takes from the calendar's month or year select part: its
-// options, its value and whether it's disabled. A choice runs inside the
-// select's update, so it updates the calendar, not the select, which
-// follows the calendar's month as it renders.
+// options, its value and whether it's disabled. A choice updates the
+// calendar, and the select follows the calendar's month as it renders.
 fn select_options(calendar: &Entity<Calendar>, kind: CalendarSelectKind, state: &CalendarSelectState) -> SelectOptions<i32> {
     let items: ListData<i32> = state
         .options

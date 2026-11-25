@@ -10,7 +10,7 @@
 use std::rc::Rc;
 
 use gpui::{App, AppContext as _, Context, Entity, Subscription, Window, WindowAppearance};
-use ui_sdk_kernel::{ChangeCallback, ChangeDetails, ChangeOptions};
+use ui_sdk_kernel::{ChangeCallback, ChangeDetails, ChangeOptions, after_update};
 use ui_sdk_storage::ValueStorage;
 
 use crate::preference::{Preference, PreferenceOptions, follow_in};
@@ -102,14 +102,18 @@ pub struct ColorSchemeOptions {
     /// `on_value_change`, and the app passes the new scheme back with
     /// `set_controlled_value`.
     pub value: Option<ColorSchemeValue>,
-    /// Called before the app's scheme changes, with its reason: `Imperative`,
+    /// Called when the app's scheme changes, with its reason: `Imperative`,
     /// or the one `set` was given, and `StorageSync` when a choice saved
-    /// under the same storage arrives. `details.cancel()` keeps the current
-    /// one. It runs inside the color scheme's update, so it may update any
-    /// entity but the color scheme.
+    /// under the same storage arrives. It runs once the update is over, so it
+    /// may update any entity, the color scheme too.
     pub on_value_change: Option<ChangeCallback<ColorSchemeValue>>,
-    /// Called when the system's preference changes. It runs inside the color
-    /// scheme's update, so it may update any entity but the color scheme.
+    /// Called before the app's scheme changes, with its reason, inside the
+    /// update: `details.cancel()` keeps the current one. It may update any
+    /// entity but the color scheme.
+    pub on_before_value_change: Option<ChangeCallback<ColorSchemeValue>>,
+    /// Called when the system's preference changes. It runs once the color
+    /// scheme's update is over, so it may update any entity, the color scheme
+    /// too.
     pub on_system_value_change: Option<SystemValueChangeCallback>,
     /// Where the choice is kept between runs, from `create_local_storage` or
     /// `create_session_storage`.
@@ -132,6 +136,14 @@ impl ColorSchemeOptions {
         callback: impl Fn(&ColorSchemeValue, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&ColorSchemeValue, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 
@@ -176,6 +188,7 @@ impl ColorScheme {
             default_value,
             value,
             on_value_change,
+            on_before_value_change,
             on_system_value_change,
             storage,
         } = options;
@@ -188,6 +201,7 @@ impl ColorScheme {
                     value,
                     storage,
                     on_value_change,
+                    on_before_value_change,
                 },
                 cx,
             )
@@ -230,8 +244,8 @@ impl ColorScheme {
         }
     }
 
-    /// Changes the app's scheme, through `on_value_change`, which can cancel
-    /// it, and saves it. The reason defaults to `Imperative`. Returns whether
+    /// Changes the app's scheme, through `on_before_value_change`, which can
+    /// cancel it, and `on_value_change`, and saves it. The reason defaults to `Imperative`. Returns whether
     /// it changed, or for a controlled scheme, whether the change was
     /// accepted.
     pub fn set(
@@ -283,7 +297,7 @@ impl ColorScheme {
         }
         self.system = system;
         if let Some(callback) = self.on_system_value_change.clone() {
-            callback(&system, window, cx);
+            after_update(window, cx, move |window, cx| callback(&system, window, cx));
         }
         cx.notify();
     }

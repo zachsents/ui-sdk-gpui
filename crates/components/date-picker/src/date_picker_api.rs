@@ -196,6 +196,7 @@ impl DatePickerOptions {
             month: self.month.clone(),
             default_month: self.default_month.clone(),
             on_month_change: self.on_month_change.clone(),
+            on_before_month_change: self.on_before_month_change.clone(),
             min: self.min.clone(),
             max: self.max.clone(),
             unavailable: self.unavailable.clone(),
@@ -203,7 +204,9 @@ impl DatePickerOptions {
             read_only: self.read_only,
             deselectable: false,
             on_focused_change: None,
+            on_before_focused_change: None,
             on_anchor_change: None,
+            on_before_anchor_change: None,
             months: self.months,
             page_by: self.page_by,
             locale: self.locale.clone(),
@@ -223,15 +226,18 @@ impl DatePickerOptions {
 
     // What the popup reads from the picker's options.
     pub(crate) fn popup_options(&self) -> PopupOptions<()> {
-        let on_open_change = self.on_open_change.clone().map(|callback| {
-            Rc::new(move |open: &bool, details: &ui_sdk_kernel::ChangeDetails, _value: Option<&SharedString>, window: &mut Window, cx: &mut App| {
-                callback(open, details, window, cx)
-            }) as PopupOpenChangeCallback
-        });
+        let popup_callback = |callback: &Option<ui_sdk_kernel::ChangeCallback<bool>>| {
+            callback.clone().map(|callback| {
+                Rc::new(move |open: &bool, details: &ui_sdk_kernel::ChangeDetails, _value: Option<&SharedString>, window: &mut Window, cx: &mut App| {
+                    callback(open, details, window, cx)
+                }) as PopupOpenChangeCallback
+            })
+        };
         PopupOptions {
             open: self.open,
             default_open: self.default_open,
-            on_open_change,
+            on_open_change: popup_callback(&self.on_open_change),
+            on_before_open_change: popup_callback(&self.on_before_open_change),
             on_open_change_complete: self.on_open_change_complete.clone(),
             presentation: Some(self.presentation),
             disabled: self.disabled,

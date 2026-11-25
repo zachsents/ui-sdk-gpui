@@ -30,8 +30,10 @@
 //!
 //! - The toaster is an entity its regions observe, so a toast added inside
 //!   another component's update shows once that update is over. Its calls
-//!   take the app; `on_dismiss` gets the app too, since a toast can close
-//!   with no window at hand, like when a promise settles.
+//!   take the app; `on_dismiss` and `on_before_dismiss` get the app too,
+//!   since a toast can close with no window at hand, like when a promise
+//!   settles. `on_dismiss` runs once the update that closed the toast is
+//!   over, through `App::defer`.
 //! - Content is text: titles, descriptions and button labels are
 //!   `SharedString`, where the original's `Content` can be any framework
 //!   node, since a gpui element is used once and the region announces the

@@ -260,7 +260,7 @@ pub struct ToggleGroup {
 
 impl ToggleGroup {
     pub fn new(options: ToggleGroupOptions, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let mut value = Controllable::new("value", options.default_value.clone()).after_update();
+        let mut value = Controllable::new("value", options.default_value.clone());
         value.set_controlled(options.value.clone());
         value.set_on_change(options.on_value_change.clone());
         value.set_on_before_change(options.on_before_value_change.clone());
@@ -460,7 +460,7 @@ impl ToggleGroup {
     }
 
     /// Presses or unpresses the toggle with `value` for the toggle itself,
-    /// which heard its own `on_pressed_change` first (`press`).
+    /// which heard its own `on_before_pressed_change` first (`press`).
     pub fn press(
         &mut self,
         value: SharedString,

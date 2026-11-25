@@ -18,7 +18,7 @@ use gpui::{
 use ui_sdk_drag_and_drop::DragSession;
 use ui_sdk_kernel::{
     ActionError, ActionOutcome, Agent, AgentAction, AgentState, AgentValue, AnnouncePending,
-    InputEvent, Instance, Reason, flag_while_bound, while_destroying,
+    InputEvent, Instance, Reason, after_update, flag_while_bound, while_destroying,
 };
 use ui_sdk_motion::{PresenceState, PresenceTiming};
 use ui_sdk_platform::{Region, TrackKeyboard, track_keyboard};
@@ -306,7 +306,8 @@ impl ToastActionProps {
 pub struct ToastCloseProps {
     /// Tells several close parts in one toast apart.
     pub id: Option<SharedString>,
-    /// Runs before the toast closes. Work it returns that goes on keeps the
+    /// Runs before the toast closes, inside the region's update, since the
+    /// region reads what it returns. Work it returns that goes on keeps the
     /// toast open and the button pending until it settles. `details.source`
     /// says how it was pressed, for changes made after the wait.
     pub action: Option<ToastActionHandler>,
@@ -332,16 +333,21 @@ impl ToastCloseProps {
         self
     }
 
-    /// The toast's cancel button: its `on_cancel` runs before the toast
-    /// closes, as the original's adapters wire a `ToastCancel` to a close
-    /// part.
+    /// The toast's cancel button: its `on_cancel` runs as the toast closes,
+    /// once the region's update is over, as the original's adapters wire a
+    /// `ToastCancel` to a close part.
     pub fn cancel(mut self, cancel: &ToastCancel) -> Self {
         self.action = cancel
             .on_cancel
             .clone()
             .map(|on_cancel| -> ToastActionHandler {
                 Rc::new(move |event, details, window, cx| {
-                    on_cancel(event, details, window, cx);
+                    let on_cancel = on_cancel.clone();
+                    let event = event.cloned();
+                    let details = details.clone();
+                    after_update(window, cx, move |window, cx| {
+                        on_cancel(event.as_ref(), &details, window, cx)
+                    });
                     ActionOutcome::Done
                 })
             });

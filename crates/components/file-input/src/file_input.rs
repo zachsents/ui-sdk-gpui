@@ -150,9 +150,10 @@ pub struct FileInputOptions {
     /// `details.cancel()` stops it. It may update any entity but the file
     /// input.
     pub on_before_value_change: Option<FileInputValueChange>,
-    /// Runs when files fail the checks, after `on_before_value_change` and
-    /// before `on_value_change`, with every reason each failed, even when
-    /// none were accepted.
+    /// Runs when files fail the checks, after `on_value_change`, with every
+    /// reason each failed, even when none were accepted. It runs once the file
+    /// input's update is over, so it may update any entity, the file input
+    /// too.
     pub on_reject: Option<FileInputReject>,
     /// Holds more than one file. New files join the ones it has, up to
     /// `max_files` in all. Without it, a new file replaces the one it has.
@@ -474,7 +475,7 @@ impl FileInput {
             .or_else(|| options.default_value.clone())
             .unwrap_or_default();
         let initial = options.default_value.clone().unwrap_or_else(|| first.clone());
-        let mut value = Controllable::new("value", first).after_update();
+        let mut value = Controllable::new("value", first);
         value.set_controlled(options.value.clone());
         let mut instance = Instance::new("file-input").with_agent(cx);
         instance.debug = options.debug;

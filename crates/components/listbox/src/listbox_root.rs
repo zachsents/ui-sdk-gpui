@@ -69,8 +69,8 @@ pub type ItemToValueFn<T> = Rc<dyn Fn(&T) -> SharedString>;
 pub type ItemEqualFn<T> = Rc<dyn Fn(&T, &T) -> bool>;
 
 /// `on_highlight`: the value focus moved to, or `None`, and where it is. It
-/// runs inside the listbox's update, so it may update any entity but the
-/// listbox.
+/// runs once the listbox's update is over, so it may update any entity, the
+/// listbox too.
 pub type HighlightCallback<T> = Rc<dyn Fn(Option<&T>, &ListHighlightDetails, &mut Window, &mut App)>;
 
 /// The options `Listbox` takes (`ListboxOptions`).

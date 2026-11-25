@@ -36,7 +36,8 @@ pub type ImageCropperCropCommitDetails = ChangeDetails;
 /// receives.
 pub type ImageCropperChangeOptions = ChangeOptions;
 
-/// `on_crop_change` and `on_crop_commit`: the crop, and what explains it.
+/// `on_crop_change`, `on_before_crop_change` and `on_crop_commit`: the crop,
+/// and what explains it.
 pub type ImageCropperCropCallback = Rc<dyn Fn(&ImageCrop, &ChangeDetails, &mut Window, &mut App)>;
 
 /// How the crop changes (`ImageCropperMode`).
@@ -163,12 +164,17 @@ pub struct ImageCropperOptions {
     /// largest in a box, the largest in a frame.
     pub default_crop: Option<ImageCrop>,
     /// Runs while the crop changes: on every step of a drag, a key or the
-    /// wheel, and once an image loads. `details.cancel()` stops it. It runs
-    /// inside the cropper's update, so it may update any entity but the
-    /// cropper.
+    /// wheel, and once an image loads. It runs once the cropper's update is
+    /// over, so it may update any entity, the cropper too.
     pub on_crop_change: Option<ImageCropperCropCallback>,
+    /// Runs as the crop is asked to change, before it does, inside the
+    /// cropper's update: `details.cancel()` stops it. It may update any entity
+    /// but the cropper.
+    pub on_before_crop_change: Option<ImageCropperCropCallback>,
     /// Runs once an interaction that changed the crop ends: the pointer
-    /// lifts, a key is pressed, the wheel pauses. For saving.
+    /// lifts, a key is pressed, the wheel pauses. For saving. It runs once the
+    /// cropper's update is over, so it may update any entity, the cropper
+    /// too.
     pub on_crop_commit: Option<ImageCropperCropCallback>,
     /// `Box` moves and resizes a selection over the whole image. `Frame`
     /// keeps the selection still and as large as it fits, and pans and zooms
@@ -215,6 +221,14 @@ impl ImageCropperOptions {
         callback: impl Fn(&ImageCrop, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_crop_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_crop_change(
+        mut self,
+        callback: impl Fn(&ImageCrop, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_crop_change = Some(Rc::new(callback));
         self
     }
 
@@ -438,6 +452,7 @@ impl ImageCropper {
         let mut crop = Controllable::new("crop", given);
         crop.set_controlled(options.crop.map(Some));
         crop.set_on_change(change_callback(options.on_crop_change.clone()));
+        crop.set_on_before_change(change_callback(options.on_before_crop_change.clone()));
         crop.set_on_commit(commit_callback(options.on_crop_commit.clone()));
         let mut instance = Instance::new("image-cropper").with_agent(cx);
         ImageCrop::register_data();
@@ -493,6 +508,7 @@ impl ImageCropper {
         self.settings = settings;
         changed |= self.crop.set_controlled(options.crop.map(Some));
         self.crop.set_on_change(change_callback(options.on_crop_change));
+        self.crop.set_on_before_change(change_callback(options.on_before_crop_change));
         self.crop.set_on_commit(commit_callback(options.on_crop_commit));
         self.instance.debug = options.debug;
         // The aspect ratio changing fits the crop to it, once the options
@@ -555,7 +571,7 @@ impl Focusable for ImageCropper {
     }
 }
 
-// `on_crop_change` for the crop the cropper holds, which has one once the
+// `on_crop_change` or `on_before_crop_change` for the crop the cropper holds, which has one once the
 // image loads.
 fn change_callback(callback: Option<ImageCropperCropCallback>) -> Option<ChangeCallback<Option<ImageCrop>>> {
     let callback = callback?;

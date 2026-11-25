@@ -109,8 +109,9 @@
 //! - A group's key names it to its label and its items, which pass it in
 //!   their `group` prop, where renderers fill it in from the group around
 //!   them. The status and hint parts take the `text` prop renderers pass.
-//! - `on_open_change` hears the trigger, and `on_query_change` the trigger
-//!   and the argument, as arguments beside the details.
+//! - `on_open_change` and `on_before_open_change` hear the trigger, and
+//!   `on_query_change` the trigger and the argument, as arguments beside the
+//!   details.
 //! - When both the item's and the menu's `on_select` return a future, the
 //!   first makes the token pending, as the original's first promise does,
 //!   and the other runs to its end.

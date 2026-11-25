@@ -19,7 +19,8 @@ use ui_sdk_kernel::{
 /// details: `Imperative`, `Reset` or `Press`.
 pub type SwitchCheckedChangeReason = CheckboxCheckedChangeReason;
 
-/// `on_checked_change`: the requested state and what explains it.
+/// `on_checked_change` and `on_before_checked_change`: the requested state
+/// and what explains it.
 pub type SwitchCheckedChange = Rc<dyn Fn(&bool, &ChangeDetails, &mut Window, &mut App)>;
 
 /// The options `Switch` takes.
@@ -30,11 +31,14 @@ pub struct SwitchOptions {
     /// Whether it's on at first, when uncontrolled. A form reset returns to
     /// it; without it, a reset leaves a controlled switch as it is.
     pub default_checked: Option<bool>,
-    /// Runs when a user, a form reset or a call wants to turn it on or off.
-    /// `details.reason` is `Press`, `Reset` or `Imperative`, and
-    /// `details.cancel()` stops it. It runs inside the switch's update, so it
-    /// may update any entity but the switch.
+    /// Runs when a user, a form reset or a call turns it on or off.
+    /// `details.reason` is `Press`, `Reset` or `Imperative`. It runs once the
+    /// switch's update is over, so it may update any entity, the switch too.
     pub on_checked_change: Option<SwitchCheckedChange>,
+    /// Runs as it is asked to turn on or off, before it does, inside the
+    /// switch's update: `details.cancel()` stops it. It may update any entity
+    /// but the switch.
+    pub on_before_checked_change: Option<SwitchCheckedChange>,
     /// Disables it like a native control: it can't be focused or changed,
     /// and isn't submitted.
     pub disabled: bool,
@@ -71,6 +75,14 @@ impl SwitchOptions {
         callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_checked_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_checked_change(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_checked_change = Some(Rc::new(callback));
         self
     }
 
@@ -124,17 +136,20 @@ pub type SwitchThumbState = SwitchState;
 
 // The control's options: a switch's booleans as checked states.
 fn toggle_options(options: &SwitchOptions) -> ToggleOptions {
-    let on_checked_change = options.on_checked_change.clone().map(|callback| {
-        Rc::new(
-            move |checked: &Checked, details: &ChangeDetails, window: &mut Window, cx: &mut App| {
-                callback(&checked.is_checked(), details, window, cx)
-            },
-        ) as ui_sdk_kernel::ChangeCallback<Checked>
-    });
+    let checked_of = |callback: &Option<SwitchCheckedChange>| {
+        callback.clone().map(|callback| {
+            Rc::new(
+                move |checked: &Checked, details: &ChangeDetails, window: &mut Window, cx: &mut App| {
+                    callback(&checked.is_checked(), details, window, cx)
+                },
+            ) as ui_sdk_kernel::ChangeCallback<Checked>
+        })
+    };
     ToggleOptions {
         checked: options.checked.map(Checked::from),
         default_checked: options.default_checked.map(Checked::from),
-        on_checked_change,
+        on_checked_change: checked_of(&options.on_checked_change),
+        on_before_checked_change: checked_of(&options.on_before_checked_change),
         disabled: options.disabled,
         read_only: options.read_only,
         required: options.required,

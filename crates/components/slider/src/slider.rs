@@ -112,7 +112,9 @@ pub struct SliderOptions<V> {
     /// stops it. It may update any entity but the slider.
     pub on_before_value_change: Option<SliderValueChange<V>>,
     /// Runs once an interaction that changed the value ends: the pointer
-    /// lifts, the key comes up, or a screen reader adjusts it. For saving.
+    /// lifts, the key comes up, or a screen reader adjusts it. For saving. It
+    /// runs once the slider's update is over, so it may update any entity,
+    /// the slider too.
     pub on_value_commit: Option<SliderValueCommit<V>>,
     /// The lowest value. Defaults to 0.
     pub min: f64,
@@ -421,7 +423,7 @@ impl<V: SliderValue> Slider<V> {
             .unwrap_or_else(|| V::shaped(vec![settings.min]));
         let first = normalized(&start, range);
         let initial = normalized(options.default_value.as_ref().unwrap_or(&first), range);
-        let mut value = Controllable::new("value", first).after_update();
+        let mut value = Controllable::new("value", first);
         value.set_controlled(options.value.as_ref().map(|value| normalized(value, range)));
         let mut instance = Instance::new("slider").with_agent(cx);
         instance.debug = options.debug;

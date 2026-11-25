@@ -69,9 +69,13 @@ pub struct AvatarOptions {
     /// source, `Loaded`, `Error`, and `Idle` when it leaves the page.
     /// `details.reason` says why: `ImageLoad`, `ImageError` or `SrcChange`.
     /// `details.event` is `None`, since gpui's `img` has no load or error
-    /// event. It runs inside the avatar's update, so it may update any entity
-    /// but the avatar.
+    /// event. It runs once the avatar's update is over, so it may update any
+    /// entity, the avatar too.
     pub on_loading_status_change: Option<ChangeCallback<AvatarLoadingStatus>>,
+    /// Runs as the loading status is asked to change, before it does, inside
+    /// the avatar's update: `details.cancel()` keeps the status as it was. It
+    /// may update any entity but the avatar.
+    pub on_before_loading_status_change: Option<ChangeCallback<AvatarLoadingStatus>>,
     /// Logs every change with its reason, in development builds.
     pub debug: bool,
 }
@@ -82,6 +86,14 @@ impl AvatarOptions {
         callback: impl Fn(&AvatarLoadingStatus, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_loading_status_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_loading_status_change(
+        mut self,
+        callback: impl Fn(&AvatarLoadingStatus, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_loading_status_change = Some(Rc::new(callback));
         self
     }
 
@@ -204,6 +216,7 @@ impl Avatar {
     pub fn new(options: AvatarOptions, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let mut loading_status = Controllable::new("loadingStatus", AvatarLoadingStatus::Idle);
         loading_status.set_on_change(options.on_loading_status_change);
+        loading_status.set_on_before_change(options.on_before_loading_status_change);
         let mut instance = Instance::new("avatar").with_agent(cx);
         instance.debug = options.debug;
         // Asking whether the root and the image are in the page notifies the
@@ -232,6 +245,8 @@ impl Avatar {
     pub fn set_options(&mut self, options: AvatarOptions, _cx: &mut Context<Self>) {
         self.loading_status
             .set_on_change(options.on_loading_status_change);
+        self.loading_status
+            .set_on_before_change(options.on_before_loading_status_change);
         self.instance.debug = options.debug;
     }
 

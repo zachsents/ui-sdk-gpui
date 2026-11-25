@@ -6,6 +6,7 @@
 //! `toolbar` alone joins the toolbar's. A disabled fieldset around it
 //! disables it too.
 
+use std::cell::Cell;
 use std::rc::Rc;
 
 use gpui::{App, Context, Entity, FocusHandle, Focusable, SharedString, Window};
@@ -17,7 +18,7 @@ use ui_sdk_kernel::part::FocusMode;
 use ui_sdk_kernel::roles::{HandledKey, Role};
 use ui_sdk_kernel::{
     Agent, AgentAction, AgentState, Aria, ChangeCallback, ChangeDetails, ChangeOptions, Controllable,
-    Instance, Part, Reason, change_source, create_details, flag_while_bound, with_source,
+    Instance, Part, Reason, after_update, change_source, create_details, flag_while_bound, with_source,
 };
 use ui_sdk_lists::{IconPlacement, ItemIconProps, ItemIconState, check_icon_item, icon_part};
 
@@ -53,12 +54,16 @@ pub struct ToggleOptions {
     pub pressed: Option<bool>,
     /// Whether it's pressed at first, when uncontrolled.
     pub default_pressed: bool,
-    /// Runs when a press wants to change it. `details.reason` is `Press` or
-    /// `Imperative`; `details.cancel()` stops it. Inside a group, it runs
-    /// before the group's `on_value_change`, and canceling it cancels the
-    /// group's change too. It runs inside the toggle's update, so it may
-    /// update any entity but the toggle.
+    /// Runs when a press changes it. `details.reason` is `Press` or
+    /// `Imperative`. Inside a group, it runs before the group's
+    /// `on_value_change`. It runs once the toggle's update is over, so it may
+    /// update any entity, the toggle too.
     pub on_pressed_change: Option<ChangeCallback<bool>>,
+    /// Runs as it is asked to change, before it does, inside the toggle's
+    /// update: `details.cancel()` stops it. Inside a group, it runs before the
+    /// group's `on_before_value_change`, and canceling it cancels the group's
+    /// change too. It may update any entity but the toggle.
+    pub on_before_pressed_change: Option<ChangeCallback<bool>>,
     /// Identifies the toggle inside a group, whose value lists the pressed
     /// toggles' values. Defaults to the toggle's generated id.
     pub value: Option<SharedString>,
@@ -96,6 +101,14 @@ impl ToggleOptions {
         callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_pressed_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_pressed_change(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_pressed_change = Some(Rc::new(callback));
         self
     }
 
@@ -165,6 +178,7 @@ pub struct Toggle {
     instance: Instance,
     pressed: Controllable<bool>,
     on_pressed_change: Option<ChangeCallback<bool>>,
+    on_before_pressed_change: Option<ChangeCallback<bool>>,
     value: Option<SharedString>,
     disabled: bool,
     focusable_when_disabled: bool,
@@ -181,12 +195,14 @@ impl Toggle {
         let mut pressed = Controllable::new("pressed", options.pressed.unwrap_or(options.default_pressed));
         pressed.set_controlled(options.pressed);
         pressed.set_on_change(options.on_pressed_change.clone());
+        pressed.set_on_before_change(options.on_before_pressed_change.clone());
         let mut instance = Instance::new("toggle").with_agent(cx);
         instance.debug = options.debug;
         Self {
             instance,
             pressed,
             on_pressed_change: options.on_pressed_change,
+            on_before_pressed_change: options.on_before_pressed_change,
             value: options.value,
             disabled: options.disabled,
             focusable_when_disabled: options.focusable_when_disabled,
@@ -203,7 +219,9 @@ impl Toggle {
     pub fn set_options(&mut self, options: ToggleOptions, cx: &mut Context<Self>) {
         let mut changed = self.pressed.set_controlled(options.pressed);
         self.pressed.set_on_change(options.on_pressed_change.clone());
+        self.pressed.set_on_before_change(options.on_before_pressed_change.clone());
         self.on_pressed_change = options.on_pressed_change;
+        self.on_before_pressed_change = options.on_before_pressed_change;
         changed |= self.disabled != options.disabled
             || self.focusable_when_disabled != options.focusable_when_disabled
             || self.value != options.value
@@ -325,17 +343,29 @@ impl Toggle {
             return false;
         }
         // The toggle hears first and can cancel. Then the group decides, and
-        // the toggle follows its value.
+        // the toggle follows its value. Its listener, waiting for the update
+        // to be over, still hears ahead of the group's, and only when the
+        // group's change went through.
         let reason = options.reason.unwrap_or(Reason::Imperative);
         let source = options
             .source
             .unwrap_or_else(|| change_source(reason, options.event.as_ref()));
         let details = create_details(reason, options.event.clone(), source);
-        if let Some(callback) = self.on_pressed_change.clone() {
+        if let Some(callback) = self.on_before_pressed_change.clone() {
             with_source(source, || callback(&pressed, &details, window, cx));
         }
         if details.canceled() {
             return false;
+        }
+        let went_through = Rc::new(Cell::new(false));
+        if let Some(callback) = self.on_pressed_change.clone() {
+            let went_through = went_through.clone();
+            let details = details.clone();
+            after_update(window, cx, move |window, cx| {
+                if went_through.get() {
+                    callback(&pressed, &details, window, cx);
+                }
+            });
         }
         let group_reason = if reason == Reason::Press { Reason::ItemPress } else { reason };
         let changed = group.update(cx, |group, cx| {
@@ -351,6 +381,7 @@ impl Toggle {
                 cx,
             )
         });
+        went_through.set(changed);
         if changed {
             cx.notify();
         }

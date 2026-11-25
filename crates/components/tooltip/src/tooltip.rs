@@ -71,20 +71,27 @@ pub struct TooltipOptions<P: Clone + PartialEq + Debug + 'static = ()> {
     pub open: Option<bool>,
     /// Whether the tooltip starts open, when uncontrolled. Defaults to false.
     pub default_open: bool,
-    /// Runs when the tooltip wants to open or close. `details.reason` says
-    /// why (see [`TooltipOpenChangeReason`]), and `details.cancel()` stops
-    /// it. It runs inside the tooltip's update, so it may update any entity
-    /// but the tooltip.
+    /// Runs when the tooltip opens or closes. `details.reason` says why (see
+    /// [`TooltipOpenChangeReason`]). It runs once the tooltip's update is
+    /// over, so it may update any entity, the tooltip too.
     pub on_open_change: Option<PopupOpenChangeCallback>,
+    /// Runs as the tooltip is asked to open or close, before it does, inside
+    /// the tooltip's update: `details.cancel()` stops it. It may update any
+    /// entity but the tooltip.
+    pub on_before_open_change: Option<PopupOpenChangeCallback>,
     /// Runs once the tooltip has finished opening or closing, after any
-    /// animation.
+    /// animation, once the tooltip's update is over.
     pub on_open_change_complete: Option<OpenChangeCompleteCallback>,
     /// Runs when the payload the content shows changes: a trigger with
     /// another payload opens the tooltip, or takes the open tooltip over,
     /// which fires no `on_open_change`, and so does a controller's
-    /// `open(payload)` on the open tooltip. `details.cancel()` keeps the
-    /// previous payload.
+    /// `open(payload)` on the open tooltip. It runs once the tooltip's update
+    /// is over.
     pub on_payload_change: Option<ChangeCallback<Option<P>>>,
+    /// Runs as the payload is asked to change, before it does, inside the
+    /// tooltip's update: `details.cancel()` keeps the previous payload. It
+    /// may update any entity but the tooltip.
+    pub on_before_payload_change: Option<ChangeCallback<Option<P>>>,
     /// How long the pointer rests on the trigger before the tooltip opens.
     /// While another tooltip is open, or was a moment ago, the next one
     /// opens at once. Defaults to 600 milliseconds.
@@ -131,8 +138,10 @@ impl<P: Clone + PartialEq + Debug + 'static> Default for TooltipOptions<P> {
             open: None,
             default_open: false,
             on_open_change: None,
+            on_before_open_change: None,
             on_open_change_complete: None,
             on_payload_change: None,
+            on_before_payload_change: None,
             delay: None,
             close_delay: None,
             disabled: false,
@@ -153,8 +162,10 @@ impl<P: Clone + PartialEq + Debug + 'static> Clone for TooltipOptions<P> {
             open: self.open,
             default_open: self.default_open,
             on_open_change: self.on_open_change.clone(),
+            on_before_open_change: self.on_before_open_change.clone(),
             on_open_change_complete: self.on_open_change_complete.clone(),
             on_payload_change: self.on_payload_change.clone(),
+            on_before_payload_change: self.on_before_payload_change.clone(),
             delay: self.delay,
             close_delay: self.close_delay,
             disabled: self.disabled,
@@ -190,6 +201,16 @@ impl<P: Clone + PartialEq + Debug + 'static> TooltipOptions<P> {
         self
     }
 
+    pub fn on_before_open_change(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_open_change = Some(Rc::new(move |open, details, _, window, cx| {
+            callback(open, details, window, cx)
+        }));
+        self
+    }
+
     pub fn on_open_change_complete(
         mut self,
         callback: impl Fn(bool, &mut Window, &mut App) + 'static,
@@ -203,6 +224,14 @@ impl<P: Clone + PartialEq + Debug + 'static> TooltipOptions<P> {
         callback: impl Fn(&Option<P>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_payload_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_payload_change(
+        mut self,
+        callback: impl Fn(&Option<P>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_payload_change = Some(Rc::new(callback));
         self
     }
 
@@ -262,8 +291,10 @@ impl<P: Clone + PartialEq + Debug + 'static> TooltipOptions<P> {
             open: self.open,
             default_open: self.default_open,
             on_open_change: self.on_open_change.clone(),
+            on_before_open_change: self.on_before_open_change.clone(),
             on_open_change_complete: self.on_open_change_complete.clone(),
             on_payload_change: self.on_payload_change.clone(),
+            on_before_payload_change: self.on_before_payload_change.clone(),
             delay: self.delay,
             close_delay: self.close_delay,
             disabled: self.disabled,

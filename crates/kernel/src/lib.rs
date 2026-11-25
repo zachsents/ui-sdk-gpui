@@ -133,7 +133,7 @@ pub use action::{
 };
 pub use attrs::{AgentMarks, Aria, AutoComplete, Checked, Current, HasPopup, Invalid, Live, Relation, Sort};
 pub use bound_keys::{flag_while_bound, key_while_bound};
-pub use change::{ChangeCallback, CommitCallback, Controllable, log};
+pub use change::{ChangeCallback, CommitCallback, Controllable, after_update, log};
 pub use controller::{ConnectedController, Controller};
 pub use derive::{Derived, derive_from_options};
 pub use details::{
@@ -144,7 +144,7 @@ pub use details::{
 pub use draft::Draft;
 pub use elements::{Measured, PartInfo, Parts, ensure_positioned};
 pub use events::{Key, SelectEvent, is_composing, key_held, select_event, set_composing};
-pub use input_source::{change_source, dispatch};
+pub use input_source::{change_source, dispatch, dispatch_then};
 pub use keep::{is_destroying, while_destroying};
 pub use modality::{
     Modality, ModalityTracker, is_focus_from_keyboard, modality_of, move_focus, restore_focus,

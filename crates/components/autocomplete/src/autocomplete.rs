@@ -312,25 +312,33 @@ pub struct AutocompleteOptions {
     pub value: Option<SharedString>,
     /// The text at first, when uncontrolled. A form reset returns to it.
     pub default_value: Option<SharedString>,
-    /// Runs when the text wants to change: typing, choosing a suggestion, a
-    /// Clear part, a form reset or the api. It runs once the autocomplete's
-    /// update is over.
+    /// Runs when the text changes: typing, choosing a suggestion, a Clear
+    /// part, a form reset or the api. It runs once the autocomplete's update
+    /// is over, so it may update any entity, the autocomplete too.
     pub on_value_change: Option<AutocompleteValueCallback>,
     /// Runs as the text is asked to change, before it does, inside the
-    /// autocomplete's update: `details.cancel()` keeps the text as it was.
+    /// autocomplete's update: `details.cancel()` keeps the text as it was. It
+    /// may update any entity but the autocomplete.
     pub on_before_value_change: Option<AutocompleteValueCallback>,
     /// Whether the suggestions are open. Pass it to control them.
     pub open: Option<bool>,
     /// Whether the suggestions start open, when uncontrolled.
     pub default_open: bool,
-    /// Runs when the suggestions want to open or close. `details.cancel()`
-    /// stops it.
+    /// Runs when the suggestions open or close, once the autocomplete's
+    /// update is over, so it may update any entity, the autocomplete too.
     pub on_open_change: Option<AutocompleteOpenCallback>,
+    /// Runs as the suggestions are asked to open or close, before they do,
+    /// inside the autocomplete's update: `details.cancel()` stops it. It may
+    /// update any entity but the autocomplete.
+    pub on_before_open_change: Option<AutocompleteOpenCallback>,
     /// Runs once the suggestions have finished opening or closing, after any
-    /// animation.
+    /// animation, once the autocomplete's update is over.
     pub on_open_change_complete: Option<Rc<dyn Fn(bool, &mut Window, &mut App)>>,
     /// Runs with the text when Enter is pressed with no suggestion
-    /// highlighted, or after choosing one with `submit_on_select`.
+    /// highlighted, or after choosing one with `submit_on_select`. It runs
+    /// inside the autocomplete's update, since whether the form submits
+    /// next reads `details.prevent_default()`, so it may update any entity
+    /// but the autocomplete.
     pub on_submit: Option<AutocompleteSubmitCallback>,
     /// The suggestions as data, which it filters without rendering every
     /// one. Render the ones to show from the content's state (`items`).
@@ -361,11 +369,13 @@ pub struct AutocompleteOptions {
     /// parts. Sets the list busy while loading.
     pub status: AsyncOptionsStatus,
     /// Runs when the highlight moves, with the suggestion's index among the
-    /// visible ones, so a virtualized list can scroll to it.
+    /// visible ones, so a virtualized list can scroll to it. It runs once the
+    /// autocomplete's update is over.
     pub on_highlight: Option<AutocompleteHighlightCallback>,
     /// Runs when the highlight or scrolling reaches the last suggestion, so
     /// the next page can load, like async options' `load_more`. Not again for
-    /// the same suggestions, unless the last load failed.
+    /// the same suggestions, unless the last load failed. It runs once the
+    /// autocomplete's update is over.
     pub on_load_more: Option<Rc<dyn Fn(&mut Window, &mut App)>>,
     /// What screen readers hear after typing pauses, when no status part is
     /// rendered. `None` says nothing. Defaults to "3 results", "No results"
@@ -403,7 +413,8 @@ pub struct AutocompleteOptions {
     /// Whether Escape, an outside press, focus or the window leaving, the
     /// back gesture and a swipe can close the suggestions. Defaults to true.
     pub dismissible: bool,
-    /// Runs when `dismissible` refused a dismissal made on purpose.
+    /// Runs when `dismissible` refused a dismissal made on purpose, once the
+    /// autocomplete's update is over.
     pub on_dismiss_attempt: Option<Rc<dyn Fn(&DismissAttemptDetails, &mut Window, &mut App)>>,
     /// Logs every change with its reason, in development builds.
     pub debug: bool,
@@ -419,6 +430,7 @@ impl Default for AutocompleteOptions {
             open: None,
             default_open: false,
             on_open_change: None,
+            on_before_open_change: None,
             on_open_change_complete: None,
             on_submit: None,
             items: None,
@@ -488,6 +500,14 @@ impl AutocompleteOptions {
 
     pub fn on_open_change(mut self, callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static) -> Self {
         self.on_open_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_open_change(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_open_change = Some(Rc::new(callback));
         self
     }
 

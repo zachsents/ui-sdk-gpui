@@ -69,9 +69,13 @@ pub struct CalendarOptions {
     pub default_month: Option<ISOMonth>,
     /// Runs when the months shown want to change: Previous or Next, a key
     /// moving focus to another month, a press on a day of another month, a
-    /// month or year select, or an api call. It runs inside the calendar's
-    /// update.
+    /// month or year select, or an api call. It runs once the calendar's
+    /// update is over.
     pub on_month_change: Option<ChangeCallback<ISOMonth>>,
+    /// Runs as the months shown are asked to change, before they do, inside
+    /// the calendar's update: `details.cancel()` keeps them. It may update
+    /// any entity but the calendar.
+    pub on_before_month_change: Option<ChangeCallback<ISOMonth>>,
     /// The earliest date that can be picked. Keys stop there, and Previous
     /// stops at its month.
     pub min: Option<ISODate>,
@@ -87,12 +91,20 @@ pub struct CalendarOptions {
     pub read_only: bool,
     /// Whether pressing the selected date again clears it, in `Single` mode.
     pub deselectable: bool,
-    /// Runs before keys, a press or `focus` move focus to another day.
-    /// `details.cancel()` keeps focus where it was.
+    /// Runs when keys, a press or `focus` moved focus to another day, once
+    /// the calendar's update is over.
     pub on_focused_change: Option<EventCallback<ISODate>>,
-    /// Runs before a press starts a range, or ends it or Escape drops it,
-    /// with `None`. `details.cancel()` keeps the start as it was.
+    /// Runs before keys, a press or `focus` move focus to another day, inside
+    /// the calendar's update: `details.cancel()` keeps focus where it was. It
+    /// may update any entity but the calendar.
+    pub on_before_focused_change: Option<EventCallback<ISODate>>,
+    /// Runs when a press started a range, or ended it or Escape dropped it,
+    /// with `None`, once the calendar's update is over.
     pub on_anchor_change: Option<EventCallback<Option<ISODate>>>,
+    /// Runs before a press starts a range, or ends it or Escape drops it,
+    /// with `None`, inside the calendar's update: `details.cancel()` keeps
+    /// the start as it was. It may update any entity but the calendar.
+    pub on_before_anchor_change: Option<EventCallback<Option<ISODate>>>,
     /// How many months show side by side, each in its own grid. 1 by default.
     pub months: usize,
     /// Whether Previous, Next and keys turn one month, or all the months
@@ -142,6 +154,7 @@ impl Default for CalendarOptions {
             month: None,
             default_month: None,
             on_month_change: None,
+            on_before_month_change: None,
             min: None,
             max: None,
             unavailable: None,
@@ -149,7 +162,9 @@ impl Default for CalendarOptions {
             read_only: false,
             deselectable: false,
             on_focused_change: None,
+            on_before_focused_change: None,
             on_anchor_change: None,
+            on_before_anchor_change: None,
             months: 1,
             page_by: PageBy::Month,
             locale: None,
@@ -218,6 +233,14 @@ impl CalendarOptions {
         self
     }
 
+    pub fn on_before_month_change(
+        mut self,
+        callback: impl Fn(&ISOMonth, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_month_change = Some(Rc::new(callback));
+        self
+    }
+
     pub fn min(mut self, min: impl Into<ISODate>) -> Self {
         self.min = Some(min.into());
         self
@@ -256,11 +279,27 @@ impl CalendarOptions {
         self
     }
 
+    pub fn on_before_focused_change(
+        mut self,
+        callback: impl Fn(&ISODate, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_focused_change = Some(Rc::new(callback));
+        self
+    }
+
     pub fn on_anchor_change(
         mut self,
         callback: impl Fn(&Option<ISODate>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_anchor_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_anchor_change(
+        mut self,
+        callback: impl Fn(&Option<ISODate>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_anchor_change = Some(Rc::new(callback));
         self
     }
 

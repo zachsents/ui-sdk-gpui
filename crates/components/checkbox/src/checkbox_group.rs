@@ -213,7 +213,7 @@ impl CheckboxGroup {
             .clone()
             .or_else(|| options.default_value.clone())
             .unwrap_or_default();
-        let mut value = Controllable::new("value", first.clone()).after_update();
+        let mut value = Controllable::new("value", first.clone());
         value.set_controlled(options.value.clone());
         value.set_on_change(options.on_value_change.clone());
         value.set_on_before_change(options.on_before_value_change.clone());

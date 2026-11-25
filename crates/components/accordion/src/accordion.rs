@@ -6,7 +6,7 @@
 //! it animates closed, and its part exposes the phases and the size it
 //! animates through.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -21,7 +21,7 @@ use ui_sdk_kernel::part::FocusMode;
 use ui_sdk_kernel::roles::Role;
 use ui_sdk_kernel::{
     Agent, AgentAction, AgentState, AgentSurface, Aria, ChangeCallback, ChangeDetails,
-    ChangeOptions, Controllable, Instance, Part, Parts, Reason, change_source, held,
+    ChangeOptions, Controllable, Instance, Part, Parts, Reason, after_update, change_source, held,
 };
 use ui_sdk_motion::PresenceTiming;
 
@@ -50,7 +50,7 @@ pub struct AccordionOptions {
     /// too.
     pub on_value_change: Option<ChangeCallback<Vec<SharedString>>>,
     /// Runs as items are asked to open or close, before they do, inside the
-    /// accordion's update and after every item's `on_open_change`:
+    /// accordion's update and after every item's `on_before_open_change`:
     /// `details.cancel()` stops it. It may update any entity but the
     /// accordion.
     pub on_before_value_change: Option<ChangeCallback<Vec<SharedString>>>,
@@ -163,12 +163,17 @@ impl AccordionOptions {
 pub struct AccordionItemProps {
     /// Stops the item from opening or closing. Its trigger stays focusable.
     pub disabled: bool,
-    /// Runs before the item opens or closes, before the accordion's
-    /// `on_value_change`. `details.cancel()` stops the whole change. It runs
-    /// inside the accordion's update.
+    /// Runs when the item opens or closes, before the accordion's
+    /// `on_value_change`. It runs once the accordion's update is over, so it
+    /// may update any entity, the accordion too.
     pub on_open_change: Option<ChangeCallback<bool>>,
+    /// Runs as the item is asked to open or close, before it does, inside
+    /// the accordion's update and before the accordion's
+    /// `on_before_value_change`: `details.cancel()` stops the whole change.
+    /// It may update any entity but the accordion.
+    pub on_before_open_change: Option<ChangeCallback<bool>>,
     /// Runs once the item's panel has finished opening or closing, after any
-    /// animation.
+    /// animation, once the accordion's update is over.
     pub on_open_change_complete: Option<OpenChangeCompleteCallback>,
 }
 
@@ -183,6 +188,14 @@ impl AccordionItemProps {
         callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_open_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_open_change(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_open_change = Some(Rc::new(callback));
         self
     }
 
@@ -328,7 +341,7 @@ pub struct Accordion {
 
 impl Accordion {
     pub fn new(options: AccordionOptions, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let mut value = Controllable::new("value", options.default_value.clone()).after_update();
+        let mut value = Controllable::new("value", options.default_value.clone());
         value.set_controlled(options.value.clone());
         value.set_on_change(options.on_value_change.clone());
         value.set_on_before_change(options.on_before_value_change.clone());
@@ -477,8 +490,9 @@ impl Accordion {
     }
 
     /// Sets the open items. Only the first counts unless `multiple` is set.
-    /// Every item's `on_open_change` hears first, including the item that
-    /// would close when another opens, and any of them can stop the change.
+    /// Every item's `on_before_open_change` hears first, including the item
+    /// that would close when another opens, and any of them can stop the
+    /// change.
     /// Returns false when canceled or when nothing changed.
     pub fn set_value(
         &mut self,
@@ -500,25 +514,46 @@ impl Accordion {
                 keys.push(key.clone());
             }
         }
+        // The items' listeners run once the update is over, before the
+        // accordion's, when the change went through.
+        let mut listeners = Vec::new();
         for key in keys {
             let open = next.contains(&key);
             if open == current.contains(&key) {
                 continue;
             }
-            let Some(on_open_change) = self.item_props(&key).and_then(|props| props.on_open_change) else {
+            let Some(props) = self.item_props(&key) else {
                 continue;
             };
+            if props.on_before_open_change.is_none() && props.on_open_change.is_none() {
+                continue;
+            }
             let source = options
                 .source
                 .unwrap_or_else(|| change_source(why, options.event.as_ref()));
             let details = ChangeDetails::new(why, source, options.event.clone());
-            on_open_change(&open, &details, window, cx);
-            if details.canceled() {
-                return false;
+            if let Some(on_before_open_change) = props.on_before_open_change {
+                on_before_open_change(&open, &details, window, cx);
+                if details.canceled() {
+                    return false;
+                }
             }
+            if let Some(on_open_change) = props.on_open_change {
+                listeners.push((on_open_change, open, details));
+            }
+        }
+        let went_through = Rc::new(Cell::new(false));
+        for (on_open_change, open, details) in listeners {
+            let went_through = went_through.clone();
+            after_update(window, cx, move |window, cx| {
+                if went_through.get() {
+                    on_open_change(&open, &details, window, cx);
+                }
+            });
         }
         self.reason.set(why);
         let changed = self.value.change(&self.instance, next, options, window, cx);
+        went_through.set(changed);
         if !changed {
             self.reason.take();
         }
@@ -706,7 +741,7 @@ impl Accordion {
     fn settled(&mut self, key: &SharedString, open: bool, window: &mut Window, cx: &mut Context<Self>) {
         self.opened.remove(key);
         if let Some(callback) = self.item_props(key).and_then(|props| props.on_open_change_complete) {
-            callback(open, window, cx);
+            after_update(window, cx, move |window, cx| callback(open, window, cx));
         }
     }
 

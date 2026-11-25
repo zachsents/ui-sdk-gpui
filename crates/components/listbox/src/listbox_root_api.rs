@@ -14,7 +14,7 @@ use ui_sdk_forms::{
     keeps_value_on_reset, labels_of,
 };
 use ui_sdk_kernel::focus_events::{on_focus, on_focus_out};
-use ui_sdk_kernel::{ChangeOptions, Controllable, InputEvent, Instance, Reason};
+use ui_sdk_kernel::{ChangeOptions, Controllable, InputEvent, Instance, Reason, after_update};
 use ui_sdk_lists::listbox_engine::{
     HighlightOptions, ItemKey, ListData, ListFiltering, ListFocus, ListHighlightDetails, ListScroller,
     ListboxEngine, ListboxEngineConfig, create_listbox_engine, highlight_from_code, highlightable,
@@ -97,7 +97,7 @@ impl<T: ItemKey + Clone + PartialEq + Debug + 'static> Listbox<T> {
             .clone()
             .or_else(|| options.default_value.clone())
             .unwrap_or_else(|| empty.clone());
-        let mut value = Controllable::new("value", first.clone()).after_update();
+        let mut value = Controllable::new("value", first.clone());
         value.set_controlled(options.value.clone());
         value.set_on_change(options.on_value_change.clone());
         value.set_on_before_change(options.on_before_value_change.clone());
@@ -638,7 +638,7 @@ impl<T: ItemKey + Clone + PartialEq + Debug + 'static> Listbox<T> {
                 index,
                 event: event.cloned(),
             };
-            on_highlight(value.as_ref(), &details, window, cx);
+            after_update(window, cx, move |window, cx| on_highlight(value.as_ref(), &details, window, cx));
         }
     }
 

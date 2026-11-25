@@ -50,19 +50,26 @@ pub struct HoverCardOptions<P: Clone + PartialEq + Debug + 'static = ()> {
     pub open: Option<bool>,
     /// Whether the card starts open, when uncontrolled. Defaults to false.
     pub default_open: bool,
-    /// Runs when the card wants to open or close. `details.reason` says why
-    /// (see [`HoverCardOpenChangeReason`]), and `details.cancel()` stops it.
-    /// It runs inside the card's update, so it may update any entity but the
-    /// card.
+    /// Runs when the card opens or closes. `details.reason` says why (see
+    /// [`HoverCardOpenChangeReason`]). It runs once the card's update is
+    /// over, so it may update any entity, the card too.
     pub on_open_change: Option<PopupOpenChangeCallback>,
+    /// Runs as the card is asked to open or close, before it does, inside
+    /// the card's update: `details.cancel()` stops it. It may update any
+    /// entity but the card.
+    pub on_before_open_change: Option<PopupOpenChangeCallback>,
     /// Runs once the card has finished opening or closing, after any
-    /// animation.
+    /// animation, once the card's update is over.
     pub on_open_change_complete: Option<OpenChangeCompleteCallback>,
     /// Runs when the payload the content shows changes: a trigger with
     /// another payload opens the card, or takes the open card over, which
     /// fires no `on_open_change`, and so does a controller's `open(payload)`
-    /// on the open card. `details.cancel()` keeps the previous payload.
+    /// on the open card. It runs once the card's update is over.
     pub on_payload_change: Option<ChangeCallback<Option<P>>>,
+    /// Runs as the payload is asked to change, before it does, inside the
+    /// card's update: `details.cancel()` keeps the previous payload. It may
+    /// update any entity but the card.
+    pub on_before_payload_change: Option<ChangeCallback<Option<P>>>,
     /// How long the pointer rests on the trigger, or keyboard focus stays on
     /// it, before the card opens. Defaults to 600 milliseconds.
     pub delay: Option<Duration>,
@@ -85,8 +92,10 @@ impl<P: Clone + PartialEq + Debug + 'static> Default for HoverCardOptions<P> {
             open: None,
             default_open: false,
             on_open_change: None,
+            on_before_open_change: None,
             on_open_change_complete: None,
             on_payload_change: None,
+            on_before_payload_change: None,
             delay: None,
             close_delay: None,
             disabled: false,
@@ -102,8 +111,10 @@ impl<P: Clone + PartialEq + Debug + 'static> Clone for HoverCardOptions<P> {
             open: self.open,
             default_open: self.default_open,
             on_open_change: self.on_open_change.clone(),
+            on_before_open_change: self.on_before_open_change.clone(),
             on_open_change_complete: self.on_open_change_complete.clone(),
             on_payload_change: self.on_payload_change.clone(),
+            on_before_payload_change: self.on_before_payload_change.clone(),
             delay: self.delay,
             close_delay: self.close_delay,
             disabled: self.disabled,
@@ -134,6 +145,16 @@ impl<P: Clone + PartialEq + Debug + 'static> HoverCardOptions<P> {
         self
     }
 
+    pub fn on_before_open_change(
+        mut self,
+        callback: impl Fn(&bool, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_open_change = Some(Rc::new(move |open, details, _, window, cx| {
+            callback(open, details, window, cx)
+        }));
+        self
+    }
+
     pub fn on_open_change_complete(
         mut self,
         callback: impl Fn(bool, &mut Window, &mut App) + 'static,
@@ -147,6 +168,14 @@ impl<P: Clone + PartialEq + Debug + 'static> HoverCardOptions<P> {
         callback: impl Fn(&Option<P>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_payload_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_payload_change(
+        mut self,
+        callback: impl Fn(&Option<P>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_payload_change = Some(Rc::new(callback));
         self
     }
 
@@ -181,8 +210,10 @@ impl<P: Clone + PartialEq + Debug + 'static> HoverCardOptions<P> {
             open: self.open,
             default_open: self.default_open,
             on_open_change: self.on_open_change.clone(),
+            on_before_open_change: self.on_before_open_change.clone(),
             on_open_change_complete: self.on_open_change_complete.clone(),
             on_payload_change: self.on_payload_change.clone(),
+            on_before_payload_change: self.on_before_payload_change.clone(),
             delay: self.delay,
             close_delay: self.close_delay,
             disabled: self.disabled,

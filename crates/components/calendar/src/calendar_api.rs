@@ -29,7 +29,7 @@ use ui_sdk_kernel::part::FocusMode;
 use ui_sdk_kernel::roles::Role;
 use ui_sdk_kernel::{
     Aria, ChangeOptions, Controllable, Current, InputEvent, Instance, Key, Live, Need, Part, Reason,
-    dispatch,
+    dispatch_then,
 };
 use ui_sdk_platform::is_rtl;
 use ui_sdk_text::locale_of;
@@ -101,7 +101,9 @@ pub struct CalendarModelState {
     pub(crate) max_days: Option<f64>,
     pub(crate) allow_unavailable: bool,
     on_focused_change: Option<EventCallback<ISODate>>,
+    on_before_focused_change: Option<EventCallback<ISODate>>,
     on_anchor_change: Option<EventCallback<Option<ISODate>>>,
+    on_before_anchor_change: Option<EventCallback<Option<ISODate>>>,
     // The date with the tab stop is the roving focus's stop (`focused`).
     pub(crate) roving: RovingFocus<ISODate>,
     // A move to `approved` was asked before focus went, so landing there asks nothing.
@@ -151,13 +153,14 @@ impl CalendarModelState {
             .or_else(|| options.default_value.clone())
             .unwrap_or_default();
         let first = normalize_value(mode, &first);
-        let mut value = Controllable::new("value", first.clone()).after_update();
+        let mut value = Controllable::new("value", first.clone());
         value.set_controlled(options.value.as_ref().map(|value| normalize_value(mode, value)));
         value.set_on_change(options.on_value_change.clone());
         value.set_on_before_change(options.on_before_value_change.clone());
         let mut month = Controllable::new("month", initial_month(options, &first));
         month.set_controlled(options.month.clone().filter(|month| is_iso_month(month)));
         month.set_on_change(options.on_month_change.clone());
+        month.set_on_before_change(options.on_before_month_change.clone());
         let today = match &options.today {
             Some(today) => date_or_null(Some(today)),
             None => Some(today_date(options.time_zone.as_deref())),
@@ -187,7 +190,9 @@ impl CalendarModelState {
             max_days: None,
             allow_unavailable: false,
             on_focused_change: None,
+            on_before_focused_change: None,
             on_anchor_change: None,
+            on_before_anchor_change: None,
             roving: RovingFocus::new(RovingFocusOptions::default(), window, cx),
             approved: None,
             pointer: None,
@@ -246,7 +251,9 @@ impl CalendarModelState {
         self.max_days = options.max_days;
         self.allow_unavailable = options.allow_unavailable;
         self.on_focused_change = options.on_focused_change.clone();
+        self.on_before_focused_change = options.on_before_focused_change.clone();
         self.on_anchor_change = options.on_anchor_change.clone();
+        self.on_before_anchor_change = options.on_before_anchor_change.clone();
         changed
     }
 
@@ -266,6 +273,7 @@ impl CalendarModelState {
             None => changed |= self.month.set_controlled(None),
         }
         self.month.set_on_change(options.on_month_change.clone());
+        self.month.set_on_before_change(options.on_before_month_change.clone());
         if let Some(today) = &options.today {
             let today = date_or_null(Some(today));
             changed |= self.today != today;
@@ -717,13 +725,13 @@ fn move_focus<H: CalendarHost>(
     if model.roving.stop().as_ref() == Some(date) {
         return true;
     }
-    let callback = model.on_focused_change.clone();
+    let (before, after) = (model.on_before_focused_change.clone(), model.on_focused_change.clone());
     let options = ChangeOptions {
         reason: Some(reason),
         event,
         source: None,
     };
-    if dispatch(callback.as_ref(), date, options, window, cx) {
+    if dispatch_then(before.as_ref(), after.as_ref(), date, options, window, cx) {
         return false;
     }
     host.calendar_mut().approved = Some(date.clone());
@@ -753,12 +761,12 @@ fn focus_landed<H: CalendarHost>(
     if &from == date {
         return true;
     }
-    let callback = model.on_focused_change.clone();
+    let (before, after) = (model.on_before_focused_change.clone(), model.on_focused_change.clone());
     let options = match &press {
         Some(press) => ChangeOptions::event_of(Reason::ItemPress, press.clone()),
         None => ChangeOptions::event_of(Reason::FocusIn, event),
     };
-    if !dispatch(callback.as_ref(), date, options, window, cx) {
+    if !dispatch_then(before.as_ref(), after.as_ref(), date, options, window, cx) {
         return true;
     }
     let model = host.calendar_mut();
@@ -799,8 +807,8 @@ fn set_anchor<H: CalendarHost>(
 ) -> bool {
     let model = host.calendar();
     if anchor != model.anchor {
-        let callback = model.on_anchor_change.clone();
-        if dispatch(callback.as_ref(), &anchor, options, window, cx) {
+        let (before, after) = (model.on_before_anchor_change.clone(), model.on_anchor_change.clone());
+        if dispatch_then(before.as_ref(), after.as_ref(), &anchor, options, window, cx) {
             return false;
         }
     }

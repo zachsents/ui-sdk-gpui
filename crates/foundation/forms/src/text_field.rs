@@ -184,7 +184,7 @@ impl TextFieldApi {
     /// textarea's, doesn't take part in implicit submission.
     pub fn new<T: TextFieldHost>(options: TextFieldOptions, multiline: bool, cx: &mut Context<T>) -> Self {
         let initial = initial_text(&options);
-        let mut value = Controllable::new("value", initial.value).after_update();
+        let mut value = Controllable::new("value", initial.value);
         value.set_controlled(options.value.clone());
         value.set_on_change(options.on_value_change.clone());
         value.set_on_before_change(options.on_before_value_change.clone());

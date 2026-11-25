@@ -97,8 +97,8 @@ struct TimersState {
 }
 
 /// What a countdown that ran out calls, inside the owner's update, with the
-/// toast's id. Returning false, like an `on_dismiss` that canceled the close,
-/// starts a new countdown, so the toast tries again later.
+/// toast's id. Returning false, like an `on_before_dismiss` that canceled the
+/// close, starts a new countdown, so the toast tries again later.
 pub type ExpireCallback<T> = Rc<dyn Fn(&mut T, &SharedString, &mut Context<T>) -> bool>;
 
 /// A region's countdowns (`createToastTimers`). Cheap to clone: clones share
@@ -265,8 +265,8 @@ impl<T: 'static> ToastTimers<T> {
     }
 }
 
-// A countdown ran out. An `on_dismiss` that cancels the close starts a new
-// countdown, so the toast tries again later.
+// A countdown ran out. An `on_before_dismiss` that cancels the close starts a
+// new countdown, so the toast tries again later.
 fn fire<T: 'static>(
     state: Weak<RefCell<TimersState>>,
     expire: ExpireCallback<T>,

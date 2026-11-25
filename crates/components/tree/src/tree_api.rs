@@ -19,7 +19,7 @@ use ui_sdk_focus::{
 use ui_sdk_forms::{Node, is_disabled, watch_form_disabled};
 use ui_sdk_kernel::dev::{self, Origin};
 use ui_sdk_kernel::{
-    ActionOutcome, AnnouncePending, ChangeOptions, Checked, Controllable, InputEvent, Instance, Key,
+    ActionOutcome, AnnouncePending, ChangeOptions, Checked, Controllable, InputEvent, Instance, Key, after_update,
     Parts, Reason, held, while_destroying,
 };
 use ui_sdk_lists::{
@@ -249,7 +249,7 @@ impl Tree {
                 .value
                 .clone()
                 .unwrap_or_else(|| options.default_value.clone().unwrap_or(empty)),
-        ).after_update();
+        );
         value.set_controlled(options.value.clone());
         value.set_on_change(options.on_value_change.clone());
         value.set_on_before_change(options.on_before_value_change.clone());
@@ -259,12 +259,14 @@ impl Tree {
         );
         expanded.set_controlled(options.expanded.clone());
         expanded.set_on_change(options.on_expanded_change.clone());
+        expanded.set_on_before_change(options.on_before_expanded_change.clone());
         let mut checked = Controllable::new(
             "checked",
             options.checked.clone().unwrap_or_else(|| options.default_checked.clone()),
         );
         checked.set_controlled(options.checked.clone());
         checked.set_on_change(options.on_checked_change.clone());
+        checked.set_on_before_change(options.on_before_checked_change.clone());
         let mut instance = Instance::new("tree").with_agent(cx);
         instance.debug = options.debug;
 
@@ -410,8 +412,10 @@ impl Tree {
         self.value.set_on_before_change(options.on_before_value_change);
         changed |= self.expanded.set_controlled(options.expanded);
         self.expanded.set_on_change(options.on_expanded_change);
+        self.expanded.set_on_before_change(options.on_before_expanded_change);
         changed |= self.checked.set_controlled(options.checked);
         self.checked.set_on_change(options.on_checked_change);
+        self.checked.set_on_before_change(options.on_before_checked_change);
         if !same(self.items.as_ref(), options.items.as_ref()) || !same(self.paths.as_ref(), options.paths.as_ref()) {
             let reuse = match (&self.data, &options.items, &options.paths) {
                 (Some(Built { source: Source::Items(old), .. }), Some(new), _) => Rc::ptr_eq(old, new),
@@ -1201,8 +1205,11 @@ impl Tree {
         window: &mut Window,
         cx: &mut App,
     ) {
-        if let Some(on_highlight) = &self.on_highlight {
-            on_highlight(key, &ListHighlightDetails { index, event }, window, cx);
+        if let Some(on_highlight) = self.on_highlight.clone() {
+            let key = key.clone();
+            after_update(window, cx, move |window, cx| {
+                on_highlight(&key, &ListHighlightDetails { index, event }, window, cx)
+            });
         }
     }
 

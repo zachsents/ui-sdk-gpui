@@ -20,7 +20,7 @@ use gpui::{
 };
 use ui_sdk_kernel::{
     ActionOutcome, Agent, AgentAction, AgentState, AgentValue, AnnouncePending, ChangeCallback, ChangeDetails,
-    ChangeOptions, Controllable, InputEvent, Instance, Reason, SelectEvent, flag_while_bound,
+    ChangeOptions, Controllable, InputEvent, Instance, Reason, SelectEvent, after_update, flag_while_bound,
 };
 use ui_sdk_lists::{
     AsyncOptionsStatus, AutoHighlight, AutocompleteCore, AutocompleteCoreConfig, AutocompleteCoreState,
@@ -132,21 +132,24 @@ pub struct CommandOptions {
     /// The search text at first, when uncontrolled.
     pub default_query: SharedString,
     /// Runs when the search text wants to change: typing, opening a page,
-    /// going back, or a call. It runs inside the command's update.
+    /// going back, or a call. It runs once the command's update is over, so
+    /// it may update any entity, the command too.
     pub on_query_change: Option<ChangeCallback<SharedString>>,
     /// The stack of open pages, from the first page opened to the current
     /// one. Pass it to control it.
     pub pages: Option<Vec<SharedString>>,
     /// The pages open at first, when uncontrolled. None by default.
     pub default_pages: Vec<SharedString>,
-    /// Runs when a page opens or Backspace or Escape goes back. It runs
-    /// inside the command's update.
+    /// Runs when a page opens or Backspace or Escape goes back. It runs once
+    /// the command's update is over, so it may update any entity, the command
+    /// too.
     pub on_pages_change: Option<ChangeCallback<Vec<SharedString>>>,
     /// Runs when a command runs, with its value: Enter, a click, or its
     /// shortcut. Return `ActionOutcome::Pending` to mark the command pending
     /// until it settles: it's pending, busy and disabled, and running it
     /// again waits. A failure puts the reason in its `error` state until the
-    /// next run. It runs inside the command's update.
+    /// next run. It runs inside the command's update, since the command reads
+    /// what it returns, so it may update any entity but the command.
     pub on_action: Option<CommandAction>,
     /// What screen readers hear once a command has been pending for a
     /// second, so a slow action doesn't pass in silence. Set it in the app's
@@ -177,7 +180,8 @@ pub struct CommandOptions {
     pub status: AsyncOptionsStatus,
     /// Runs when the highlight or scrolling reaches the last command, so the
     /// next page can load. Not again for the same commands, unless the last
-    /// load failed.
+    /// load failed. It runs once the command's update is over, so it may
+    /// update any entity, the command too.
     pub on_load_more: Option<LoadMoreFn>,
     /// What screen readers hear after typing pauses, when no status part is
     /// rendered. `None` from it says nothing. "3 results", "No results" or
@@ -383,6 +387,8 @@ pub struct CommandItemProps {
     /// press that ran it, or a new select event for a shortcut or a call's
     /// `run()`. `prevent_default()` skips `on_action` and the page. Returning
     /// `ActionOutcome::Pending` marks the command pending, like `on_action`.
+    /// It runs inside the command's update, since the command reads what it
+    /// returns, so it may update any entity but the command.
     pub on_select: Option<CommandSelect>,
     /// The group it's in, by the group part's key.
     pub group: Option<SharedString>,
@@ -591,7 +597,7 @@ impl Command {
             Some(value) => value.clone(),
             None => options.default_value.clone(),
         };
-        let mut value = Controllable::new("value", current_value).after_update();
+        let mut value = Controllable::new("value", current_value);
         value.set_controlled(options.value.clone());
         let mut query = Controllable::new("query", options.query.clone().unwrap_or(options.default_query.clone()));
         query.set_controlled(options.query.clone());
@@ -649,7 +655,14 @@ impl Command {
                 // for the commands that left.
                 settles_mount: Some(Rc::new(|this: &Command| this.awaiting.is_some())),
                 r#loop: Some(Rc::new(|this: &Command| this.r#loop)),
-                on_load_more: Some(Rc::new(|this: &Command| this.on_load_more.clone())),
+                on_load_more: Some(Rc::new(|this: &Command| {
+                    this.on_load_more.clone().map(|load| {
+                        Rc::new(move |window: &mut Window, cx: &mut App| {
+                            let load = load.clone();
+                            after_update(window, cx, move |window, cx| load(window, cx));
+                        }) as LoadMoreFn
+                    })
+                })),
                 announcement: Some(Rc::new(|this: &Command| this.announcement.clone())),
                 silent: Some(Rc::new(|this: &Command| {
                     flag_while_bound(&this.instance, "status").unwrap_or(false)
