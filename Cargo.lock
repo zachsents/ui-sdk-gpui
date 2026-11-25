@@ -6616,6 +6616,7 @@ version = "0.4.0"
 dependencies = [
  "gpui",
  "gpui_platform",
+ "icu_segmenter",
  "log",
  "ui-sdk-kernel",
  "ui-sdk-platform",

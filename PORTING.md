@@ -438,6 +438,7 @@ entity's state outside its parts calls `instance.record_view(window)`.
 | `localStorage` | the storage crate |
 | `matchMedia` | `window.appearance()` and the preferences crate |
 | `<input>`, `<textarea>` | `ui-sdk-native`'s text field |
+| a page's selectable text | `ui-sdk-native`'s `SelectableText` and `TextSelection` |
 | `<form>`, hidden inputs, validity, `<label for>` | the forms crate |
 | clipboard | `cx.write_to_clipboard(ClipboardItem::new_string(..))`, `cx.read_from_clipboard()` |
 | `<input type="file">` | `cx.prompt_for_paths(PathPromptOptions { .. })` |

@@ -125,7 +125,7 @@ The crates the components are built from, for components of your own. `crates/fo
 | `ui-sdk-kernel` | Parts, controlled state, change details, the agent surface. | `Instance`, `Part`, `Controllable`, `Agent` | [Define a Primitive](https://ui-sdk.dev/docs/core/kernel/define-a-primitive), [Handle Changes](https://ui-sdk.dev/docs/core/kernel/handle-changes) |
 | `ui-sdk-lists` | The listbox engine, virtualized lists, tree data. | `create_listbox`, `create_virtualizer`, `create_stick_to_bottom`, `create_tree_collection` | [Lists](https://ui-sdk.dev/docs/core/behaviors/lists), [Trees](https://ui-sdk.dev/docs/core/behaviors/trees) |
 | `ui-sdk-motion` | Enter and exit transitions, panels, sheets, gesture physics. | `Presence`, `Panel`, `create_velocity_tracker`, `solve_spring` | [Transitions and Gestures](https://ui-sdk.dev/docs/core/behaviors/motion) |
-| `ui-sdk-native` | The text field standing in for `<input>` and `<textarea>`. | `TextField`, `TextFieldOptions`, `TextFieldStyle` | None |
+| `ui-sdk-native` | The text field standing in for `<input>` and `<textarea>`, and selectable text standing in for a page's words. | `TextField`, `TextFieldOptions`, `TextFieldStyle`, `SelectableText`, `TextSelection` | None |
 | `ui-sdk-number` | Format, parse, step and snap numbers by locale. | `format_number`, `parse_number`, `step_from_key`, `snap_to_step` | [Numbers](https://ui-sdk.dev/docs/core/number) |
 | `ui-sdk-page` | The agent bridge, `observe`, history and undo. | `create_agent`, `agent_tools`, `observe`, `create_history` | [Observe](https://ui-sdk.dev/docs/core/observe), [Connect an Agent](https://ui-sdk.dev/docs/agents/connect-an-agent), [History and Undo](https://ui-sdk.dev/docs/agents/connect-an-agent/history-and-undo) |
 | `ui-sdk-platform` | Announcements, direction, layers, placement, shortcut matching. | `live_regions`, `announce`, `position`, `push_layer` | [Platform](https://ui-sdk.dev/docs/core/platform), [Mobile](https://ui-sdk.dev/docs/core/mobile) |
@@ -136,4 +136,4 @@ The crates the components are built from, for components of your own. `crates/fo
 | `ui-sdk-storage` | Local and session storage. | `init`, `create_local_storage`, `create_session_storage` | [Storage](https://ui-sdk.dev/docs/core/storage) |
 | `ui-sdk-text` | Typeahead, search ranking, accessible names, input history. | `create_typeahead`, `fuzzy_score`, `match_ranges`, `create_input_history` | [Text](https://ui-sdk.dev/docs/core/text) |
 
-Examples: `cargo run -p ui-sdk-native --example text_field` and `cargo run -p ui-sdk-page --example agent`.
+Examples: `cargo run -p ui-sdk-native --example text_field`, `cargo run -p ui-sdk-native --example selectable_text` and `cargo run -p ui-sdk-page --example agent`.

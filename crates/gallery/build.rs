@@ -25,6 +25,7 @@ const SECTIONS: &[(&str, &str, &str, &str)] = &[
     ("password_input", "Password input", "../components/password-input/examples/password_input.rs", PLAIN),
     ("otp_input", "OTP input", "../components/otp-input/examples/otp_input.rs", PLAIN),
     ("text_field", "Text field", "../native/examples/text_field.rs", PLAIN),
+    ("selectable_text", "Selectable text", "../native/examples/selectable_text.rs", PLAIN),
     ("file_input", "File input", "../components/file-input/examples/file_input.rs", PLAIN),
     ("calendar", "Calendar", "../components/calendar/examples/calendar.rs", PLAIN),
     ("date_input", "Date input", "../components/date-input/examples/date_input.rs", PLAIN),

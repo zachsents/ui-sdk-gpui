@@ -1,5 +1,11 @@
 //! Stand-ins for the elements a browser provides that the original builds on.
 //!
+//! [`SelectableText`] is a page's words, which the reader selects and copies
+//! but doesn't edit: runs of text sharing a [`TextSelection`], selected by
+//! press and drag across them, by word after a double press and by paragraph
+//! after a triple press, as a browser and a Mac's text do (module
+//! [`selectable_text`]).
+//!
 //! [`TextField`] is `<input>` and `<textarea>`, which every text-entry
 //! component builds on: an entity with a `root` part, the api the original
 //! uses on `HTMLInputElement` (`value`, `set_value`, `selection_start`,
@@ -68,13 +74,19 @@ mod input_handler;
 mod keys;
 mod layout;
 mod mouse;
+pub mod selectable_text;
 pub mod style;
 pub mod text_field;
 
 pub use adapter::TextFieldHandle;
+pub use boundaries::{paragraph_at, word_at};
 pub use events::{
     BeforeEdit, Edit, FieldHook, FieldNotice, InputType, SelectionDirection, TextFieldEvent,
     TextFilter,
+};
+pub use selectable_text::{
+    Granularity, Join, LinkLook, SelectableText, TextPosition, TextSelection,
+    default_selection_wash,
 };
 pub use style::{TextFieldAlign, TextFieldKind, TextFieldStyle};
 pub use text_field::{
