@@ -64,10 +64,14 @@ pub struct InputOptions {
     pub default_value: Option<SharedString>,
     /// Called when the user changes the value: typing (`InputChange`), a
     /// Clear part (`ClearPress`), a form reset (`Reset`) or a call
-    /// (`Imperative`). `details.cancel()` keeps the value as it was, with the
-    /// text and the caret back where they were. It runs inside the input's
-    /// update, so it may update any entity but the input.
+    /// (`Imperative`). It runs once the input's update is over, so it may
+    /// update any entity, the input too.
     pub on_value_change: Option<ChangeCallback<SharedString>>,
+    /// Runs as the value is asked to change, before it does, inside the
+    /// input's update: `details.cancel()` keeps the value as it was, with the
+    /// text and the caret back where they were. It may update any entity but
+    /// the input.
+    pub on_before_value_change: Option<ChangeCallback<SharedString>>,
     /// Disables the field.
     pub disabled: bool,
     /// Makes the field read-only.
@@ -123,6 +127,14 @@ impl InputOptions {
         callback: impl Fn(&SharedString, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&SharedString, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 
@@ -221,6 +233,7 @@ impl InputOptions {
             value: self.value.clone(),
             default_value: self.default_value.clone(),
             on_value_change: self.on_value_change.clone(),
+            on_before_value_change: self.on_before_value_change.clone(),
         }
     }
 
@@ -279,10 +292,13 @@ pub struct TextareaOptions {
     pub default_value: Option<SharedString>,
     /// Called when the user changes the value: typing (`InputChange`), a
     /// Clear part (`ClearPress`), a form reset (`Reset`) or a call
-    /// (`Imperative`). `details.cancel()` keeps the value as it was. It runs
-    /// inside the textarea's update, so it may update any entity but the
-    /// textarea.
+    /// (`Imperative`). It runs once the textarea's update is over, so it may
+    /// update any entity, the textarea too.
     pub on_value_change: Option<ChangeCallback<SharedString>>,
+    /// Runs as the value is asked to change, before it does, inside the
+    /// textarea's update: `details.cancel()` keeps the value as it was. It
+    /// may update any entity but the textarea.
+    pub on_before_value_change: Option<ChangeCallback<SharedString>>,
     /// Disables the field.
     pub disabled: bool,
     /// Makes the field read-only.
@@ -341,6 +357,14 @@ impl TextareaOptions {
         callback: impl Fn(&SharedString, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&SharedString, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 
@@ -437,6 +461,7 @@ impl TextareaOptions {
             value: self.value.clone(),
             default_value: self.default_value.clone(),
             on_value_change: self.on_value_change.clone(),
+            on_before_value_change: self.on_before_value_change.clone(),
         }
     }
 

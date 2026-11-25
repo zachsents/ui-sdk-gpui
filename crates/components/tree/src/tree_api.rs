@@ -249,9 +249,10 @@ impl Tree {
                 .value
                 .clone()
                 .unwrap_or_else(|| options.default_value.clone().unwrap_or(empty)),
-        );
+        ).after_update();
         value.set_controlled(options.value.clone());
         value.set_on_change(options.on_value_change.clone());
+        value.set_on_before_change(options.on_before_value_change.clone());
         let mut expanded = Controllable::new(
             "expanded",
             options.expanded.clone().unwrap_or_else(|| options.default_expanded.clone()),
@@ -406,6 +407,7 @@ impl Tree {
         }
         let mut changed = self.value.set_controlled(options.value);
         self.value.set_on_change(options.on_value_change);
+        self.value.set_on_before_change(options.on_before_value_change);
         changed |= self.expanded.set_controlled(options.expanded);
         self.expanded.set_on_change(options.on_expanded_change);
         changed |= self.checked.set_controlled(options.checked);

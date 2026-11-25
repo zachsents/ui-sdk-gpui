@@ -82,10 +82,14 @@ pub struct ListboxOptions<T> {
     /// to it. Without one, nothing: `None`, or an empty list with `multiple`.
     pub default_value: Option<ListboxValue<T>>,
     /// Runs when a user, a form reset or a call wants to change the value.
-    /// `details.reason` is one of [`ListboxValueChangeReason`]'s, and
-    /// `details.cancel()` stops it. It runs inside the listbox's update, so
-    /// it may update any entity but the listbox.
+    /// `details.reason` is one of [`ListboxValueChangeReason`]'s. It runs
+    /// once the listbox's update is over, so it may update any entity, the
+    /// listbox too.
     pub on_value_change: Option<ChangeCallback<ListboxValue<T>>>,
+    /// Runs as the value is asked to change, before it does, inside the
+    /// listbox's update: `details.cancel()` stops it. It may update any
+    /// entity but the listbox.
+    pub on_before_value_change: Option<ChangeCallback<ListboxValue<T>>>,
     /// Whether several items can be selected. The value is then a list,
     /// Shift selects ranges, and Ctrl or ⌘ with A selects every item.
     pub multiple: bool,
@@ -145,6 +149,7 @@ impl<T> Default for ListboxOptions<T> {
             value: None,
             default_value: None,
             on_value_change: None,
+            on_before_value_change: None,
             multiple: false,
             activation: None,
             deselectable: false,
@@ -172,6 +177,7 @@ impl<T: Clone> Clone for ListboxOptions<T> {
             value: self.value.clone(),
             default_value: self.default_value.clone(),
             on_value_change: self.on_value_change.clone(),
+            on_before_value_change: self.on_before_value_change.clone(),
             multiple: self.multiple,
             activation: self.activation,
             deselectable: self.deselectable,
@@ -209,6 +215,14 @@ impl<T> ListboxOptions<T> {
         callback: impl Fn(&ListboxValue<T>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&ListboxValue<T>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 

@@ -120,9 +120,13 @@ pub struct CommandOptions {
     pub default_value: Option<SharedString>,
     /// Runs when the highlight moves: arrow keys, the pointer, typing, a page
     /// change or a call. `details.index` says where the command is, for
-    /// virtualized lists. It runs inside the command's update, so it may
-    /// update any entity but the command.
+    /// virtualized lists. It runs once the command's update is over, so it
+    /// may update any entity, the command too.
     pub on_value_change: Option<CommandValueChange>,
+    /// Runs as the highlight is asked to move, before it does, inside the
+    /// command's update: `details.cancel()` keeps it where it was. It may
+    /// update any entity but the command.
+    pub on_before_value_change: Option<CommandValueChange>,
     /// The search text, which filters the commands. Pass it to control it.
     pub query: Option<SharedString>,
     /// The search text at first, when uncontrolled.
@@ -194,6 +198,7 @@ impl Default for CommandOptions {
             value: None,
             default_value: None,
             on_value_change: None,
+            on_before_value_change: None,
             query: None,
             default_query: SharedString::default(),
             on_query_change: None,
@@ -233,6 +238,14 @@ impl CommandOptions {
         callback: impl Fn(&Option<SharedString>, &CommandValueChangeDetails<'_>, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&Option<SharedString>, &CommandValueChangeDetails<'_>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 
@@ -527,6 +540,7 @@ pub struct Command {
 
     // Options.
     pub(crate) on_value_change: Option<CommandValueChange>,
+    pub(crate) on_before_value_change: Option<CommandValueChange>,
     pub(crate) on_action: Option<CommandAction>,
     pub(crate) pending_announcement: Option<SharedString>,
     pub(crate) empty_items: Option<CommandData>,
@@ -577,7 +591,7 @@ impl Command {
             Some(value) => value.clone(),
             None => options.default_value.clone(),
         };
-        let mut value = Controllable::new("value", current_value);
+        let mut value = Controllable::new("value", current_value).after_update();
         value.set_controlled(options.value.clone());
         let mut query = Controllable::new("query", options.query.clone().unwrap_or(options.default_query.clone()));
         query.set_controlled(options.query.clone());
@@ -672,6 +686,7 @@ impl Command {
             pending: Vec::new(),
             error: None,
             on_value_change: options.on_value_change.clone(),
+            on_before_value_change: options.on_before_value_change.clone(),
             on_action: options.on_action.clone(),
             pending_announcement: options.pending_announcement.clone(),
             empty_items: options.empty_items.clone(),
@@ -722,6 +737,7 @@ impl Command {
         self.items = options.items.clone();
         self.status = options.status;
         self.on_value_change = options.on_value_change.clone();
+        self.on_before_value_change = options.on_before_value_change.clone();
         self.on_action = options.on_action.clone();
         self.pending_announcement = options.pending_announcement.clone();
         self.empty_items = options.empty_items.clone();

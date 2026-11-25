@@ -340,9 +340,10 @@ impl<T: ComboboxItemValue> Combobox<T> {
             .default_value
             .clone()
             .unwrap_or_else(|| ListValue::empty(multiple));
-        let mut value = Controllable::new("value", starting.clone());
+        let mut value = Controllable::new("value", starting.clone()).after_update();
         value.set_controlled(options.value.clone());
         value.set_on_change(options.on_value_change.clone());
+        value.set_on_before_change(options.on_before_value_change.clone());
         let query_text = options
             .query
             .clone()
@@ -707,6 +708,7 @@ impl<T: ComboboxItemValue> Combobox<T> {
         }
         changed |= self.value.set_controlled(options.value.clone());
         self.value.set_on_change(options.on_value_change.clone());
+        self.value.set_on_before_change(options.on_before_value_change.clone());
         changed |= self.query.set_controlled(options.query.clone());
         self.query.set_on_change(options.on_query_change.clone());
         changed |= self.popup.set_options(popup_options(&options), cx);

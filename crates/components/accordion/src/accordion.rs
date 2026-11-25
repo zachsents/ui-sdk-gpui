@@ -45,10 +45,15 @@ pub struct AccordionOptions {
     /// The items open at first, when uncontrolled.
     pub default_value: Vec<SharedString>,
     /// Runs when items want to open or close. `details.reason` is
-    /// `TriggerPress`, `FindInPage` or `Imperative`, and `details.cancel()`
-    /// stops it. It runs inside the accordion's update, after every item's
-    /// `on_open_change`, so it may update any entity but the accordion.
+    /// `TriggerPress`, `FindInPage` or `Imperative`. It runs once the
+    /// accordion's update is over, so it may update any entity, the accordion
+    /// too.
     pub on_value_change: Option<ChangeCallback<Vec<SharedString>>>,
+    /// Runs as items are asked to open or close, before they do, inside the
+    /// accordion's update and after every item's `on_open_change`:
+    /// `details.cancel()` stops it. It may update any entity but the
+    /// accordion.
+    pub on_before_value_change: Option<ChangeCallback<Vec<SharedString>>>,
     /// Whether several items can be open at once. Otherwise opening one
     /// closes the others.
     pub multiple: bool,
@@ -77,6 +82,7 @@ impl Default for AccordionOptions {
             value: None,
             default_value: Vec::new(),
             on_value_change: None,
+            on_before_value_change: None,
             multiple: false,
             collapsible: true,
             disabled: false,
@@ -104,6 +110,14 @@ impl AccordionOptions {
         callback: impl Fn(&Vec<SharedString>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&Vec<SharedString>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 
@@ -314,9 +328,10 @@ pub struct Accordion {
 
 impl Accordion {
     pub fn new(options: AccordionOptions, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let mut value = Controllable::new("value", options.default_value.clone());
+        let mut value = Controllable::new("value", options.default_value.clone()).after_update();
         value.set_controlled(options.value.clone());
         value.set_on_change(options.on_value_change.clone());
+        value.set_on_before_change(options.on_before_value_change.clone());
         let mut instance = Instance::new("accordion").with_agent(cx);
         instance.debug = options.debug;
         let previous = value.get().clone();
@@ -348,6 +363,7 @@ impl Accordion {
     pub fn set_options(&mut self, options: AccordionOptions, window: &mut Window, cx: &mut Context<Self>) {
         let mut changed = self.value.set_controlled(options.value);
         self.value.set_on_change(options.on_value_change);
+        self.value.set_on_before_change(options.on_before_value_change);
         changed |= self.multiple != options.multiple
             || self.collapsible != options.collapsible
             || self.disabled != options.disabled

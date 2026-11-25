@@ -40,8 +40,10 @@ pub struct AutocompleteChosen {
 /// Reasons: `InputChange`, `ItemPress`, `ListNavigation`, `EscapeKey`,
 /// `ClearPress`, `Reset` and `Imperative`
 /// (`AutocompleteValueChangeReason`). `details.cancel()` keeps the text as it
-/// was. It runs inside the autocomplete's update, so it may update any
-/// entity but the autocomplete.
+/// was in `on_before_value_change`, which runs inside the autocomplete's
+/// update, so it may update any entity but the autocomplete;
+/// `on_value_change` runs once the update is over, so it may update any
+/// entity, the autocomplete too.
 pub type AutocompleteValueCallback =
     Rc<dyn Fn(&SharedString, &ChangeDetails, Option<&AutocompleteChosen>, &mut Window, &mut App)>;
 
@@ -311,8 +313,12 @@ pub struct AutocompleteOptions {
     /// The text at first, when uncontrolled. A form reset returns to it.
     pub default_value: Option<SharedString>,
     /// Runs when the text wants to change: typing, choosing a suggestion, a
-    /// Clear part, a form reset or the api.
+    /// Clear part, a form reset or the api. It runs once the autocomplete's
+    /// update is over.
     pub on_value_change: Option<AutocompleteValueCallback>,
+    /// Runs as the text is asked to change, before it does, inside the
+    /// autocomplete's update: `details.cancel()` keeps the text as it was.
+    pub on_before_value_change: Option<AutocompleteValueCallback>,
     /// Whether the suggestions are open. Pass it to control them.
     pub open: Option<bool>,
     /// Whether the suggestions start open, when uncontrolled.
@@ -409,6 +415,7 @@ impl Default for AutocompleteOptions {
             value: None,
             default_value: None,
             on_value_change: None,
+            on_before_value_change: None,
             open: None,
             default_open: false,
             on_open_change: None,
@@ -458,6 +465,14 @@ impl AutocompleteOptions {
         callback: impl Fn(&SharedString, &ChangeDetails, Option<&AutocompleteChosen>, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&SharedString, &ChangeDetails, Option<&AutocompleteChosen>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 

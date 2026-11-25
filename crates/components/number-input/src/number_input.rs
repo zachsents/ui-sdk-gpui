@@ -54,9 +54,13 @@ pub struct NumberInputOptions {
     /// Empty by default.
     pub default_value: Option<f64>,
     /// Runs when the value changes: as a typed number becomes valid, and on
-    /// every step. `details.cancel()` stops it. It runs inside the input's
-    /// update, so it may update any entity but the input.
+    /// every step. It runs once the input's update is over, so it may update
+    /// any entity, the input too.
     pub on_value_change: Option<ChangeCallback<Option<f64>>>,
+    /// Runs as the value is asked to change, before it does, inside the
+    /// input's update: `details.cancel()` stops it. It may update any entity
+    /// but the input.
+    pub on_before_value_change: Option<ChangeCallback<Option<f64>>>,
     /// Runs once an interaction that changed the value ends: typing is
     /// committed, a key or a button is released, or a scrub ends. For
     /// saving.
@@ -127,6 +131,14 @@ impl NumberInputOptions {
         callback: impl Fn(&Option<f64>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&Option<f64>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 
@@ -405,9 +417,10 @@ impl NumberInput {
         let settings = settings(&options);
         let (controlled, default_value) = (number_of(options.value), finite(options.default_value));
         let start = controlled.unwrap_or(default_value);
-        let mut value = Controllable::new("value", start);
+        let mut value = Controllable::new("value", start).after_update();
         value.set_controlled(controlled);
         value.set_on_change(options.on_value_change.clone());
+        value.set_on_before_change(options.on_before_value_change.clone());
         value.set_on_commit(options.on_value_commit.clone());
         let mut instance = Instance::new("number-input").with_agent(cx);
         instance.debug = options.debug;
@@ -513,6 +526,7 @@ impl NumberInput {
         }
         self.has_default = default_value.is_some();
         self.value.set_on_change(options.on_value_change);
+        self.value.set_on_before_change(options.on_before_value_change);
         self.value.set_on_commit(options.on_value_commit);
         self.instance.debug = options.debug;
         changed |= self.arrive(number_of(options.value));

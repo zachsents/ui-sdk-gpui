@@ -103,10 +103,14 @@ pub struct SliderOptions<V> {
     /// Defaults to `min`.
     pub default_value: Option<V>,
     /// Runs while the value changes: on every step of a drag or a key.
-    /// `details.thumb` says which thumb moved, `details.reason` why, and
-    /// `details.cancel()` stops it. It runs inside the slider's update, so it
-    /// may update any entity but the slider.
+    /// `details.thumb` says which thumb moved, and `details.reason` why. It
+    /// runs once the slider's update is over, so it may update any entity,
+    /// the slider too.
     pub on_value_change: Option<SliderValueChange<V>>,
+    /// Runs as the value is asked to change, before it does, inside the
+    /// slider's update, with the thumb in `details.thumb`: `details.cancel()`
+    /// stops it. It may update any entity but the slider.
+    pub on_before_value_change: Option<SliderValueChange<V>>,
     /// Runs once an interaction that changed the value ends: the pointer
     /// lifts, the key comes up, or a screen reader adjusts it. For saving.
     pub on_value_commit: Option<SliderValueCommit<V>>,
@@ -156,6 +160,7 @@ impl<V> Default for SliderOptions<V> {
             value: None,
             default_value: None,
             on_value_change: None,
+            on_before_value_change: None,
             on_value_commit: None,
             min: 0.0,
             max: 100.0,
@@ -191,6 +196,14 @@ impl<V> SliderOptions<V> {
         callback: impl Fn(&V, &SliderValueChangeDetails<'_>, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&V, &SliderValueChangeDetails<'_>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 
@@ -371,6 +384,7 @@ pub struct Slider<V: SliderValue = f64> {
     pub(crate) instance: Instance,
     pub(crate) value: Controllable<V>,
     pub(crate) on_value_change: Option<SliderValueChange<V>>,
+    pub(crate) on_before_value_change: Option<SliderValueChange<V>>,
     pub(crate) on_value_commit: Option<SliderValueCommit<V>>,
     // What a form reset returns to: `default_value`, or the first value.
     pub(crate) initial: V,
@@ -407,7 +421,7 @@ impl<V: SliderValue> Slider<V> {
             .unwrap_or_else(|| V::shaped(vec![settings.min]));
         let first = normalized(&start, range);
         let initial = normalized(options.default_value.as_ref().unwrap_or(&first), range);
-        let mut value = Controllable::new("value", first);
+        let mut value = Controllable::new("value", first).after_update();
         value.set_controlled(options.value.as_ref().map(|value| normalized(value, range)));
         let mut instance = Instance::new("slider").with_agent(cx);
         instance.debug = options.debug;
@@ -444,6 +458,7 @@ impl<V: SliderValue> Slider<V> {
             instance,
             value,
             on_value_change: options.on_value_change,
+            on_before_value_change: options.on_before_value_change,
             on_value_commit: options.on_value_commit,
             initial,
             has_default: options.default_value.is_some(),
@@ -481,6 +496,7 @@ impl<V: SliderValue> Slider<V> {
             .set_controlled(options.value.as_ref().map(|value| normalized(value, range)));
         changed |= self.clamp_to_bounds(options.value.is_some());
         self.on_value_change = options.on_value_change;
+        self.on_before_value_change = options.on_before_value_change;
         self.on_value_commit = options.on_value_commit;
         self.instance.debug = options.debug;
         self.end_if_locked(window, cx);

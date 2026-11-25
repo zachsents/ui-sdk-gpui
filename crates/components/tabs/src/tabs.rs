@@ -93,10 +93,14 @@ pub struct TabsOptions {
     /// enabled tab, which never calls `on_value_change`.
     pub default_value: Option<SharedString>,
     /// Runs when the selection wants to change. `details.reason` is
-    /// `ItemPress`, `ListNavigation`, `ItemRemoved` or `Imperative`, and
-    /// `details.cancel()` stops it. It runs inside the tabs' update, so it
-    /// may update any entity but the tabs.
+    /// `ItemPress`, `ListNavigation`, `ItemRemoved` or `Imperative`. It runs
+    /// once the tabs' update is over, so it may update any entity, the tabs
+    /// too.
     pub on_value_change: Option<ChangeCallback<Option<SharedString>>>,
+    /// Runs as the selection is asked to change, before it does, inside the
+    /// tabs' update: `details.cancel()` stops it. It may update any entity
+    /// but the tabs.
+    pub on_before_value_change: Option<ChangeCallback<Option<SharedString>>>,
     /// Which arrow keys move between tabs: Left and Right, or Up and Down.
     /// Horizontal when unset.
     pub orientation: Option<TabsOrientation>,
@@ -123,6 +127,7 @@ impl Default for TabsOptions {
             value: None,
             default_value: None,
             on_value_change: None,
+            on_before_value_change: None,
             orientation: None,
             activation: TabsActivation::Automatic,
             r#loop: true,
@@ -149,6 +154,14 @@ impl TabsOptions {
         callback: impl Fn(&Option<SharedString>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&Option<SharedString>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 
@@ -357,9 +370,10 @@ pub struct Tabs {
 
 impl Tabs {
     pub fn new(options: TabsOptions, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let mut value = Controllable::new("value", options.default_value.clone());
+        let mut value = Controllable::new("value", options.default_value.clone()).after_update();
         value.set_controlled(options.value.clone());
         value.set_on_change(options.on_value_change.clone());
+        value.set_on_before_change(options.on_before_value_change.clone());
         let mut instance = Instance::new("tabs").with_agent(cx);
         instance.debug = options.debug;
         let orientation = orientation_of(options.orientation, Orientation::Horizontal);
@@ -414,6 +428,7 @@ impl Tabs {
     pub fn set_options(&mut self, options: TabsOptions, window: &mut Window, cx: &mut Context<Self>) {
         let mut changed = self.value.set_controlled(options.value);
         self.value.set_on_change(options.on_value_change);
+        self.value.set_on_before_change(options.on_before_value_change);
         let orientation = orientation_of(options.orientation, Orientation::Horizontal);
         changed |= self.orientation != orientation
             || self.activation != options.activation

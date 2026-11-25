@@ -233,10 +233,13 @@ pub struct TreeOptions {
     /// The value selected at first, when uncontrolled. Nothing by default.
     pub default_value: Option<TreeValue>,
     /// Runs when the selection wants to change. `details.reason` is
-    /// `ItemPress`, `ListNavigation` or `Imperative`, and `details.cancel()`
-    /// stops it. It runs inside the tree's update, so it may update any
-    /// entity but the tree.
+    /// `ItemPress`, `ListNavigation` or `Imperative`. It runs once the tree's
+    /// update is over, so it may update any entity, the tree too.
     pub on_value_change: Option<ChangeCallback<TreeValue>>,
+    /// Runs as the selection is asked to change, before it does, inside the
+    /// tree's update: `details.cancel()` stops it. It may update any entity
+    /// but the tree.
+    pub on_before_value_change: Option<ChangeCallback<TreeValue>>,
     /// Whether moving focus with the keyboard selects, with one item
     /// selectable. `Manual` by default.
     pub activation: TreeActivation,
@@ -330,6 +333,7 @@ impl Default for TreeOptions {
             value: None,
             default_value: None,
             on_value_change: None,
+            on_before_value_change: None,
             activation: TreeActivation::Manual,
             expanded: None,
             default_expanded: Vec::new(),
@@ -392,6 +396,14 @@ impl TreeOptions {
         callback: impl Fn(&TreeValue, &ui_sdk_kernel::ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&TreeValue, &ui_sdk_kernel::ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 

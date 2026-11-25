@@ -99,10 +99,13 @@ pub struct ColorPickerOptions {
     /// Black by default.
     pub default_value: Option<SharedString>,
     /// Runs while the value changes: on every step of a drag or a key.
-    /// `details.color` is the color, and `details.cancel()` stops it. It runs
-    /// inside the picker's update, so it may update any entity but the
-    /// picker.
+    /// `details.color` is the color. It runs once the picker's update is
+    /// over, so it may update any entity, the picker too.
     pub on_value_change: Option<ColorPickerValueChange>,
+    /// Runs as the value is asked to change, before it does, inside the
+    /// picker's update, with the color in `details.color`: `details.cancel()`
+    /// stops it. It may update any entity but the picker.
+    pub on_before_value_change: Option<ColorPickerValueChange>,
     /// Runs once an interaction that changed the value ends: the pointer
     /// lifts, a key is pressed, a swatch is picked. For saving.
     pub on_value_commit: Option<ColorPickerValueCommit>,
@@ -142,6 +145,7 @@ impl Default for ColorPickerOptions {
             value: None,
             default_value: None,
             on_value_change: None,
+            on_before_value_change: None,
             on_value_commit: None,
             space: ColorPickerSpace::Hsv,
             format: None,
@@ -172,6 +176,14 @@ impl ColorPickerOptions {
         callback: impl Fn(&SharedString, &ColorPickerValueChangeDetails<'_>, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&SharedString, &ColorPickerValueChangeDetails<'_>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 
@@ -434,6 +446,7 @@ pub struct ColorPicker {
     pub(crate) instance: Instance,
     pub(crate) value: Controllable<SharedString>,
     pub(crate) on_value_change: Option<ColorPickerValueChange>,
+    pub(crate) on_before_value_change: Option<ColorPickerValueChange>,
     pub(crate) on_value_commit: Option<ColorPickerValueCommit>,
     // What a form reset returns to.
     pub(crate) initial: SharedString,
@@ -478,7 +491,7 @@ impl ColorPicker {
             .and_then(|given| color_in(given, settings.space))
             .unwrap_or_else(|| black(settings.space));
         let start = given.unwrap_or_else(|| settings.output(&color));
-        let mut value = Controllable::new("value", start.clone());
+        let mut value = Controllable::new("value", start.clone()).after_update();
         value.set_controlled(options.value.clone());
         let mut instance = Instance::new("color-picker").with_agent(cx);
         instance.debug = options.debug;
@@ -534,6 +547,7 @@ impl ColorPicker {
             instance,
             value,
             on_value_change: options.on_value_change,
+            on_before_value_change: options.on_before_value_change,
             on_value_commit: options.on_value_commit,
             has_default: options.default_value.is_some(),
             initial: options.default_value.unwrap_or_else(|| start.clone()),
@@ -581,6 +595,7 @@ impl ColorPicker {
         self.settings = settings;
         changed |= self.value.set_controlled(options.value);
         self.on_value_change = options.on_value_change;
+        self.on_before_value_change = options.on_before_value_change;
         self.on_value_commit = options.on_value_commit;
         self.instance.debug = options.debug;
         self.sync_channel_fields(window, cx);

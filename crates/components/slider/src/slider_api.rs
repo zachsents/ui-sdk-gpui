@@ -277,7 +277,8 @@ impl<V: SliderValue> Slider<V> {
         cx.notify();
     }
 
-    // Asks for a value, with the thumb that moved, through `on_value_change`.
+    // Asks for a value, with the thumb that moved, through
+    // `on_before_value_change` and `on_value_change`.
     pub(crate) fn change_value(
         &mut self,
         value: V,
@@ -288,6 +289,8 @@ impl<V: SliderValue> Slider<V> {
     ) -> bool {
         self.value
             .set_on_change(change_callback(self.on_value_change.clone(), thumb));
+        self.value
+            .set_on_before_change(change_callback(self.on_before_value_change.clone(), thumb));
         let done = self.value.change(&self.instance, value, options, window, cx);
         if done {
             self.after_change(cx);
@@ -807,7 +810,7 @@ fn js_sign(value: f64) -> f64 {
     }
 }
 
-// `on_value_change` with the thumb that moved.
+// `on_value_change` or `on_before_value_change` with the thumb that moved.
 fn change_callback<V: SliderValue>(
     callback: Option<SliderValueChange<V>>,
     thumb: Option<usize>,

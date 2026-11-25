@@ -134,7 +134,7 @@ impl OtpInput {
             &base.pattern,
             base.max_length,
         );
-        let mut value = Controllable::new("value", first);
+        let mut value = Controllable::new("value", first).after_update();
         value.set_controlled(
             options
                 .value
@@ -142,6 +142,7 @@ impl OtpInput {
                 .map(|value| clean_code(value, &base.pattern, base.max_length)),
         );
         value.set_on_change(options.on_value_change.clone());
+        value.set_on_before_change(options.on_before_value_change.clone());
         value.set_on_commit(options.on_value_commit.clone());
         let internals = ElementInternals::new(cx);
         internals.set_id(base.id.clone(), cx);
@@ -207,6 +208,7 @@ impl OtpInput {
         self.settings = base;
         changed |= self.value.set_controlled(controlled);
         self.value.set_on_change(options.on_value_change.clone());
+        self.value.set_on_before_change(options.on_before_value_change.clone());
         self.value.set_on_commit(options.on_value_commit);
         self.sync_element(window, cx);
         self.sync_field(cx);

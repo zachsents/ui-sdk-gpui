@@ -151,9 +151,10 @@ impl CalendarModelState {
             .or_else(|| options.default_value.clone())
             .unwrap_or_default();
         let first = normalize_value(mode, &first);
-        let mut value = Controllable::new("value", first.clone());
+        let mut value = Controllable::new("value", first.clone()).after_update();
         value.set_controlled(options.value.as_ref().map(|value| normalize_value(mode, value)));
         value.set_on_change(options.on_value_change.clone());
+        value.set_on_before_change(options.on_before_value_change.clone());
         let mut month = Controllable::new("month", initial_month(options, &first));
         month.set_controlled(options.month.clone().filter(|month| is_iso_month(month)));
         month.set_on_change(options.on_month_change.clone());
@@ -258,6 +259,7 @@ impl CalendarModelState {
             .value
             .set_controlled(options.value.as_ref().map(|value| normalize_value(options.mode, value)));
         self.value.set_on_change(options.on_value_change.clone());
+        self.value.set_on_before_change(options.on_before_value_change.clone());
         match &options.month {
             Some(month) if is_iso_month(month) => changed |= self.month.set_controlled(Some(month.clone())),
             Some(_) => {}

@@ -91,10 +91,14 @@ pub struct SelectOptions<T> {
     /// to it. Without one, nothing: `None`, or an empty list with `multiple`.
     pub default_value: Option<SelectValue<T>>,
     /// Runs when a user, a form reset or a call wants to change the value.
-    /// `details.reason` is one of [`SelectValueChangeReason`]'s, and
-    /// `details.cancel()` stops it. It runs inside the select's update, so it
-    /// may update any entity but the select.
+    /// `details.reason` is one of [`SelectValueChangeReason`]'s. It runs once
+    /// the select's update is over, so it may update any entity, the select
+    /// too.
     pub on_value_change: Option<ChangeCallback<SelectValue<T>>>,
+    /// Runs as the value is asked to change, before it does, inside the
+    /// select's update: `details.cancel()` stops it. It may update any entity
+    /// but the select.
+    pub on_before_value_change: Option<ChangeCallback<SelectValue<T>>>,
     /// Whether the list is open. Pass it to control it.
     pub open: Option<bool>,
     /// Whether the list starts open, when uncontrolled.
@@ -209,6 +213,7 @@ impl<T> Default for SelectOptions<T> {
             value: None,
             default_value: None,
             on_value_change: None,
+            on_before_value_change: None,
             open: None,
             default_open: false,
             on_open_change: None,
@@ -252,6 +257,7 @@ impl<T: Clone> Clone for SelectOptions<T> {
             value: self.value.clone(),
             default_value: self.default_value.clone(),
             on_value_change: self.on_value_change.clone(),
+            on_before_value_change: self.on_before_value_change.clone(),
             open: self.open,
             default_open: self.default_open,
             on_open_change: self.on_open_change.clone(),
@@ -305,6 +311,14 @@ impl<T> SelectOptions<T> {
         callback: impl Fn(&SelectValue<T>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&SelectValue<T>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 

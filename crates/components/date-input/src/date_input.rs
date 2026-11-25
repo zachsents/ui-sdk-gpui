@@ -30,10 +30,14 @@ pub struct DateInputOptions {
     pub default_value: Option<Option<SharedString>>,
     /// Runs when the value wants to change: once every segment holds
     /// something, and again with `None` when one is emptied. Its reasons are
-    /// `InputChange`, `StepKey`, `Paste`, `Reset` and `Imperative`.
-    /// `details.cancel()` keeps the value. It runs inside the input's update,
-    /// so it may update any entity but the input.
+    /// `InputChange`, `StepKey`, `Paste`, `Reset` and `Imperative`. It runs
+    /// once the input's update is over, so it may update any entity, the
+    /// input too.
     pub on_value_change: Option<Rc<dyn Fn(&Option<SharedString>, &ChangeDetails, &mut Window, &mut App)>>,
+    /// Runs as the value is asked to change, before it does, inside the
+    /// input's update: `details.cancel()` keeps the value. It may update any
+    /// entity but the input.
+    pub on_before_value_change: Option<Rc<dyn Fn(&Option<SharedString>, &ChangeDetails, &mut Window, &mut App)>>,
     /// The smallest unit it shows. `Day` shows a date, and `Hour`, `Minute`
     /// or `Second` add the time down to it. `Day` by default.
     pub granularity: Option<DateInputGranularity>,
@@ -84,6 +88,14 @@ impl DateInputOptions {
         callback: impl Fn(&Option<SharedString>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&Option<SharedString>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 
@@ -157,6 +169,7 @@ impl DateInputOptions {
             value: self.value,
             default_value: self.default_value,
             on_value_change: self.on_value_change,
+            on_before_value_change: self.on_before_value_change,
             granularity: self.granularity,
             hour_cycle: self.hour_cycle,
             min: self.min,

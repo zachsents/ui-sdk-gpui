@@ -373,10 +373,14 @@ pub struct RadioGroupProps {
     /// The value selected at first, when uncontrolled.
     pub default_value: Option<SharedString>,
     /// Runs when the selection wants to change, before the menu's
-    /// `on_value_change`. `details.reason` is `ItemPress` or `Imperative`,
-    /// and `details.cancel()` stops it. It runs inside the menu's update, so
-    /// it may update any entity but the menu.
+    /// `on_value_change`. `details.reason` is `ItemPress` or `Imperative`. It
+    /// runs once the menu's update is over, so it may update any entity, the
+    /// menu too.
     pub on_value_change: Option<ChangeCallback<SharedString>>,
+    /// Runs as the selection is asked to change, before it does and before
+    /// the menu's `on_before_value_change`, inside the menu's update:
+    /// `details.cancel()` stops it. It may update any entity but the menu.
+    pub on_before_value_change: Option<ChangeCallback<SharedString>>,
 }
 
 impl RadioGroupProps {
@@ -406,6 +410,14 @@ impl RadioGroupProps {
         callback: impl Fn(&SharedString, &ui_sdk_kernel::ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&SharedString, &ui_sdk_kernel::ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 }
@@ -722,6 +734,7 @@ pub(crate) struct Shared<P: Clone + PartialEq + Debug + 'static> {
     pub(crate) on_action: Option<crate::menu::MenuActionCallback>,
     pub(crate) on_checked_change: Option<crate::menu::MenuCheckedChangeCallback>,
     pub(crate) on_value_change: Option<crate::menu::MenuValueChangeCallback>,
+    pub(crate) on_before_value_change: Option<crate::menu::MenuValueChangeCallback>,
     pub(crate) pending_announcement: Option<SharedString>,
     pub(crate) modal: Option<MenuModal>,
     pub(crate) presentation: PresentationSetting,
@@ -1512,15 +1525,19 @@ impl<P: Clone + PartialEq + Debug + 'static> Menu<P> {
         let props = self.radio_groups.borrow().get(group).cloned();
         let source = change_source(reason, event.as_ref());
         let details = ui_sdk_kernel::ChangeDetails::new(reason, source, event.clone());
-        if let Some(callback) = props.as_ref().and_then(|props| props.on_value_change.clone()) {
+        if let Some(callback) = props.as_ref().and_then(|props| props.on_before_value_change.clone()) {
             with_source(source, || callback(value, &details, window, cx));
         }
         if details.canceled() {
             return false;
         }
         let shared = ui_sdk_kernel::ChangeDetails::new(reason, source, event);
-        let callback = self.shared.root().settings.borrow().on_value_change.clone();
-        if let Some(callback) = callback {
+        let root = self.shared.root();
+        let (before, after) = {
+            let settings = root.settings.borrow();
+            (settings.on_before_value_change.clone(), settings.on_value_change.clone())
+        };
+        if let Some(callback) = before {
             let details = crate::menu::MenuValueChangeDetails::new(&shared, group.clone());
             with_source(source, || callback(value, &details, window, cx));
         }
@@ -1531,6 +1548,19 @@ impl<P: Clone + PartialEq + Debug + 'static> Menu<P> {
             self.radios.insert(group.clone(), value.clone());
             cx.notify();
         }
+        // The group's and the menu's `on_value_change` hear it once the
+        // update is over.
+        let group_callback = props.and_then(|props| props.on_value_change);
+        let (value, group) = (value.clone(), group.clone());
+        window.defer(cx, move |window, cx| {
+            if let Some(callback) = group_callback {
+                with_source(source, || callback(&value, &details, window, cx));
+            }
+            if let Some(callback) = after {
+                let details = crate::menu::MenuValueChangeDetails::new(&shared, group);
+                with_source(source, || callback(&value, &details, window, cx));
+            }
+        });
         true
     }
 

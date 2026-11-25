@@ -221,7 +221,7 @@ impl Edit {
     }
 }
 
-// `on_value_change` with what the edit did.
+// `on_value_change` or `on_before_value_change` with what the edit did.
 fn change_callback(
     callback: Option<TokenInputValueChange>,
     input_type: Option<&'static str>,
@@ -597,7 +597,8 @@ impl TokenInput {
     }
 
     /// Asks for a new value (`commit`): it's normalized, and unless it's the
-    /// same, `on_value_change` hears it with what explains it. Returns
+    /// same, `on_before_value_change` and `on_value_change` hear it with what
+    /// explains it. Returns
     /// whether it went through.
     pub(crate) fn commit(&mut self, next: &[Segment], edit: Edit, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let before = self.committed.clone();
@@ -623,14 +624,21 @@ impl TokenInput {
                 .source
                 .unwrap_or_else(|| resolve_source(edit.reason, edit.event.as_ref()));
             let details = ChangeDetails::new(edit.reason, source, edit.event.clone());
-            if let Some(callback) = self.on_value_change.clone() {
+            if let Some(callback) = self.on_before_value_change.clone() {
                 let extra = TokenInputValueChangeDetails::new(&details, edit.input_type, &removed);
                 with_source(source, || callback(&value, &extra, window, cx));
             }
-            !details.canceled()
+            let accepted = !details.canceled();
+            if accepted && let Some(callback) = change_callback(self.on_value_change.clone(), edit.input_type, removed.clone()) {
+                let value = value.clone();
+                window.defer(cx, move |window, cx| with_source(source, || callback(&value, &details, window, cx)));
+            }
+            accepted
         } else {
             self.value
                 .set_on_change(change_callback(self.on_value_change.clone(), edit.input_type, removed.clone()));
+            self.value
+                .set_on_before_change(change_callback(self.on_before_value_change.clone(), edit.input_type, removed.clone()));
             self.value.change(
                 &self.instance,
                 value.clone(),

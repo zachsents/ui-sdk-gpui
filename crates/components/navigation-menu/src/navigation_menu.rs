@@ -81,9 +81,13 @@ pub struct NavigationMenuOptions {
     /// The item open at first, when uncontrolled.
     pub default_value: Option<SharedString>,
     /// Runs when an item wants to open or the open one to close.
-    /// `details.reason` says why, and `details.cancel()` stops it. It runs
-    /// inside the menu's update, so it may update any entity but the menu.
+    /// `details.reason` says why. It runs once the menu's update is over, so
+    /// it may update any entity, the menu too.
     pub on_value_change: Option<ChangeCallback<Option<SharedString>>>,
+    /// Runs as an item is asked to open or the open one to close, before it
+    /// does, inside the menu's update: `details.cancel()` stops it. It may
+    /// update any entity but the menu.
+    pub on_before_value_change: Option<ChangeCallback<Option<SharedString>>>,
     /// Runs once the menu has finished opening or closing, after any
     /// animation. Switching items doesn't count.
     pub on_open_change_complete: Option<OpenChangeCompleteCallback>,
@@ -120,6 +124,7 @@ impl Default for NavigationMenuOptions {
             value: None,
             default_value: None,
             on_value_change: None,
+            on_before_value_change: None,
             on_open_change_complete: None,
             delay: Duration::from_millis(50),
             close_delay: Duration::from_millis(50),
@@ -148,6 +153,14 @@ impl NavigationMenuOptions {
         callback: impl Fn(&Option<SharedString>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&Option<SharedString>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 

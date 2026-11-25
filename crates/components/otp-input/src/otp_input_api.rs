@@ -60,13 +60,16 @@ pub struct OtpInputOptions {
     pub default_value: Option<SharedString>,
     /// Runs when the code changes: typing or deleting (`InputChange`), a
     /// paste (`Paste`), the field's undo and redo (`Undo`, `Redo`), a form
-    /// reset (`Reset`) or a call (`Imperative`). `details.cancel()` keeps
-    /// the code as it was. It runs inside the input's update, so it may
-    /// update any entity but the input.
+    /// reset (`Reset`) or a call (`Imperative`). It runs once the input's
+    /// update is over, so it may update any entity, the input too.
     pub on_value_change: Option<ChangeCallback<SharedString>>,
+    /// Runs as the code is asked to change, before it does, inside the
+    /// input's update: `details.cancel()` keeps the code as it was. It may
+    /// update any entity but the input.
+    pub on_before_value_change: Option<ChangeCallback<SharedString>>,
     /// Runs when a change fills every slot, with the whole code, like to
     /// verify it. A call filling it counts, so does a code that changes
-    /// while full. It runs inside the input's update.
+    /// while full. It runs once the input's update is over.
     pub on_value_commit: Option<CommitCallback<SharedString>>,
     /// How many characters the code has, one slot each. 6 by default.
     pub max_length: Option<usize>,
@@ -111,6 +114,14 @@ impl OtpInputOptions {
         callback: impl Fn(&SharedString, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&SharedString, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 

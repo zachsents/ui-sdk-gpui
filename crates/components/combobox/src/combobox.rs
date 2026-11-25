@@ -474,9 +474,13 @@ pub struct ComboboxOptions<T> {
     /// to it.
     pub default_value: Option<ComboboxValue<T>>,
     /// Runs when a user, a form reset or the api wants to change the value.
-    /// `details.cancel()` stops it. It runs inside the combobox's update, so
-    /// it may update any entity but the combobox.
+    /// It runs once the combobox's update is over, so it may update any
+    /// entity, the combobox too.
     pub on_value_change: Option<ComboboxValueCallback<T>>,
+    /// Runs as the value is asked to change, before it does, inside the
+    /// combobox's update: `details.cancel()` stops it. It may update any
+    /// entity but the combobox.
+    pub on_before_value_change: Option<ComboboxValueCallback<T>>,
     /// The input's text, which filters the list. Pass it to control it.
     /// Choosing an item sets it to the item's label, or empties it with
     /// `multiple`.
@@ -595,6 +599,7 @@ impl<T> Default for ComboboxOptions<T> {
             value: None,
             default_value: None,
             on_value_change: None,
+            on_before_value_change: None,
             query: None,
             default_query: None,
             on_query_change: None,
@@ -642,6 +647,7 @@ impl<T: Clone> Clone for ComboboxOptions<T> {
             value: self.value.clone(),
             default_value: self.default_value.clone(),
             on_value_change: self.on_value_change.clone(),
+            on_before_value_change: self.on_before_value_change.clone(),
             query: self.query.clone(),
             default_query: self.default_query.clone(),
             on_query_change: self.on_query_change.clone(),
@@ -703,6 +709,14 @@ impl<T: Clone + PartialEq + Debug + 'static> ComboboxOptions<T> {
         callback: impl Fn(&ComboboxValue<T>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&ComboboxValue<T>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 

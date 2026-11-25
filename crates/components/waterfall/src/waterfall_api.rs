@@ -87,9 +87,10 @@ impl Waterfall {
         let mut value = Controllable::new(
             "value",
             options.value.clone().unwrap_or_else(|| options.default_value.clone()),
-        );
+        ).after_update();
         value.set_controlled(options.value.clone());
         value.set_on_change(options.on_value_change.clone());
+        value.set_on_before_change(options.on_before_value_change.clone());
         let mut expanded = Controllable::new(
             "expanded",
             options.expanded.clone().unwrap_or_else(|| options.default_expanded.clone()),
@@ -140,6 +141,7 @@ impl Waterfall {
     pub fn set_options(&mut self, options: WaterfallOptions, window: &mut Window, cx: &mut Context<Self>) {
         let mut changed = self.value.set_controlled(options.value);
         self.value.set_on_change(options.on_value_change);
+        self.value.set_on_before_change(options.on_before_value_change);
         changed |= self.expanded.set_controlled(options.expanded);
         self.expanded.set_on_change(options.on_expanded_change);
         if !Rc::ptr_eq(&self.items, &options.items) {

@@ -168,9 +168,13 @@ pub struct TokenInputOptions {
     pub default_value: Option<TokenInputValue>,
     /// Runs when typing, pasting, a menu, undo or a call wants to change the
     /// value. `details.reason` says why, `details.removed` lists removed
-    /// tokens, and `details.cancel()` stops it. It runs inside the input's
-    /// update, so it may update any entity but the input.
+    /// tokens. It runs once the input's update is over, so it may update any
+    /// entity, the input too.
     pub on_value_change: Option<TokenInputValueChange>,
+    /// Runs as the value is asked to change, before it does, inside the
+    /// input's update, with what explains it in the details:
+    /// `details.cancel()` stops it. It may update any entity but the input.
+    pub on_before_value_change: Option<TokenInputValueChange>,
     /// Runs on the submit shortcut, unless an input method is composing or a
     /// trigger menu took the key. Without it, the shortcut submits the form
     /// the input is in. With neither, the key is left alone, so Enter starts
@@ -231,6 +235,14 @@ impl TokenInputOptions {
         callback: impl Fn(&TokenInputValue, &TokenInputValueChangeDetails<'_>, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&TokenInputValue, &TokenInputValueChangeDetails<'_>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 
@@ -452,6 +464,7 @@ pub struct TokenInput {
     pub(crate) focus_handle: FocusHandle,
     pub(crate) settings: Settings,
     pub(crate) on_value_change: Option<TokenInputValueChange>,
+    pub(crate) on_before_value_change: Option<TokenInputValueChange>,
     pub(crate) on_submit: Option<TokenInputSubmit>,
 
     // State: the value, the one a reset returns to, and what else parts read.
@@ -524,7 +537,7 @@ impl TokenInput {
             .value
             .as_ref()
             .map_or_else(|| initial.clone(), |value| passed.get(value));
-        let mut value = Controllable::new("value", current.clone());
+        let mut value = Controllable::new("value", current.clone()).after_update();
         value.set_controlled(options.value.is_some().then(|| current.clone()));
         let mut instance = Instance::new("token-input").with_agent(cx);
         Segment::register_data();
@@ -571,6 +584,7 @@ impl TokenInput {
             focus_handle,
             settings: Settings::of(&options),
             on_value_change: options.on_value_change.clone(),
+            on_before_value_change: options.on_before_value_change.clone(),
             on_submit: options.on_submit.clone(),
             value,
             initial,
@@ -621,6 +635,7 @@ impl TokenInput {
         let mut changed = settings != self.settings;
         self.settings = settings;
         self.on_value_change = options.on_value_change.clone();
+        self.on_before_value_change = options.on_before_value_change.clone();
         self.on_submit = options.on_submit.clone();
         self.history.set_options(options.history.unwrap_or_default());
         self.instance.debug = options.debug;

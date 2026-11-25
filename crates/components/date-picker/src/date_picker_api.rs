@@ -269,6 +269,7 @@ impl DatePickerOptions {
             value: self.value.clone(),
             default_value: self.default_value.clone(),
             on_value_change: self.on_value_change.clone(),
+            on_before_value_change: self.on_before_value_change.clone(),
             month: self.month.clone(),
             default_month: self.default_month.clone(),
             on_month_change: self.on_month_change.clone(),

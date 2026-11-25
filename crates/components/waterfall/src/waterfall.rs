@@ -147,10 +147,13 @@ pub struct WaterfallOptions {
     /// The span selected at first, when uncontrolled.
     pub default_value: Option<SharedString>,
     /// Runs when the selection wants to change. `details.reason` is
-    /// `ItemPress` or `Imperative`, and `details.cancel()` stops it. It runs
-    /// inside the waterfall's update, so it may update any entity but the
-    /// waterfall.
+    /// `ItemPress` or `Imperative`. It runs once the waterfall's update is
+    /// over, so it may update any entity, the waterfall too.
     pub on_value_change: Option<ChangeCallback<Option<SharedString>>>,
+    /// Runs as the selection is asked to change, before it does, inside the
+    /// waterfall's update: `details.cancel()` stops it. It may update any
+    /// entity but the waterfall.
+    pub on_before_value_change: Option<ChangeCallback<Option<SharedString>>>,
     /// The expanded spans' values. Pass it to control which spans show
     /// their children.
     pub expanded: Option<Vec<SharedString>>,
@@ -208,6 +211,14 @@ impl WaterfallOptions {
         callback: impl Fn(&Option<SharedString>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&Option<SharedString>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 

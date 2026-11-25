@@ -142,12 +142,17 @@ pub struct FileInputOptions {
     pub default_value: Option<Vec<File>>,
     /// Runs when files are added or removed, with what changed in the
     /// details: `details.reason` is `Picker`, `Drop`, `Paste`, `RemovePress`,
-    /// `Reset` or `Imperative`, and `details.cancel()` stops it. It runs
-    /// inside the file input's update, so it may update any entity but the
-    /// file input.
+    /// `Reset` or `Imperative`. It runs once the file input's update is over,
+    /// so it may update any entity, the file input too.
     pub on_value_change: Option<FileInputValueChange>,
-    /// Runs when files fail the checks, after `on_value_change`, with every
-    /// reason each failed, even when none were accepted.
+    /// Runs as files are asked to be added or removed, before they are,
+    /// inside the file input's update, with what changed in the details:
+    /// `details.cancel()` stops it. It may update any entity but the file
+    /// input.
+    pub on_before_value_change: Option<FileInputValueChange>,
+    /// Runs when files fail the checks, after `on_before_value_change` and
+    /// before `on_value_change`, with every reason each failed, even when
+    /// none were accepted.
     pub on_reject: Option<FileInputReject>,
     /// Holds more than one file. New files join the ones it has, up to
     /// `max_files` in all. Without it, a new file replaces the one it has.
@@ -216,6 +221,14 @@ impl FileInputOptions {
         callback: impl Fn(&[File], &FileInputValueChangeDetails<'_>, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&[File], &FileInputValueChangeDetails<'_>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 
@@ -427,6 +440,7 @@ pub struct FileInput {
     pub(crate) min_size: Option<u64>,
     pub(crate) validate: Option<FileValidator<File>>,
     pub(crate) on_value_change: Option<FileInputValueChange>,
+    pub(crate) on_before_value_change: Option<FileInputValueChange>,
     pub(crate) on_reject: Option<FileInputReject>,
     pub(crate) announcement: Option<FileInputAnnouncement>,
     pub(crate) form_disabled: bool,
@@ -460,7 +474,7 @@ impl FileInput {
             .or_else(|| options.default_value.clone())
             .unwrap_or_default();
         let initial = options.default_value.clone().unwrap_or_else(|| first.clone());
-        let mut value = Controllable::new("value", first);
+        let mut value = Controllable::new("value", first).after_update();
         value.set_controlled(options.value.clone());
         let mut instance = Instance::new("file-input").with_agent(cx);
         instance.debug = options.debug;
@@ -497,6 +511,7 @@ impl FileInput {
             min_size: options.min_size,
             validate: options.validate,
             on_value_change: options.on_value_change,
+            on_before_value_change: options.on_before_value_change,
             on_reject: options.on_reject,
             announcement: options.announcement,
             form_disabled: false,
@@ -534,6 +549,7 @@ impl FileInput {
         self.min_size = options.min_size;
         self.validate = options.validate;
         self.on_value_change = options.on_value_change;
+        self.on_before_value_change = options.on_before_value_change;
         self.on_reject = options.on_reject;
         self.announcement = options.announcement;
         self.instance.debug = options.debug;

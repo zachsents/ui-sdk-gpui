@@ -104,9 +104,10 @@ impl RadioGroupApi {
             Some(value) => value.clone(),
             None => options.default_value.clone().flatten(),
         };
-        let mut value = Controllable::new("value", first.clone());
+        let mut value = Controllable::new("value", first.clone()).after_update();
         value.set_controlled(options.value.clone());
         value.set_on_change(options.on_value_change.clone());
+        value.set_on_before_change(options.on_before_value_change.clone());
         let roving = RovingFocus::new(RovingFocusOptions::default().remember(false), window, cx);
         let internals = ElementInternals::new(cx);
         // A group isn't focusable: a label pointing at it, or a submit that
@@ -154,6 +155,7 @@ impl RadioGroupApi {
     pub fn set_options(&mut self, options: &RadioGroupOptions) -> bool {
         let mut changed = self.value.set_controlled(options.value.clone());
         self.value.set_on_change(options.on_value_change.clone());
+        self.value.set_on_before_change(options.on_before_value_change.clone());
         // Like a native radio's `defaultChecked`, changing it changes what a
         // reset returns to.
         if let Some(default) = &options.default_value {

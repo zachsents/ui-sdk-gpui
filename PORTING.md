@@ -258,6 +258,11 @@ A `definePrimitive` definition becomes a struct held in an `Entity`:
 - **Callbacks run inside the component's update.** They get `&mut Window` and
   `&mut App` and may update any entity but the component itself (gpui panics
   on a reentrant update). Say so on callbacks apps use to control a value.
+  A `value` is the exception: its key is made with
+  `Controllable::new("value", ..).after_update()`, so `on_value_change` and
+  `on_value_commit` run once the update is over and may update anything, and
+  `on_before_value_change`, given with `set_on_before_change`, is the
+  callback inside the update that can `cancel()`.
 - **Slots are part methods** returning a `Part<State>`:
   `pub fn root(this: &Entity<Self>, cx: &App) -> Part<ToggleState>`, and for a
   slot there are many of, the key too:

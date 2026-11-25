@@ -60,9 +60,13 @@ pub struct SegmentedControlOptions {
     pub default_value: Option<Option<SharedString>>,
     /// Runs when a user or a form reset wants to change the value.
     /// `details.reason` says why (`ItemPress`, `ListNavigation`, `Reset`,
-    /// `Imperative`), and `details.cancel()` stops it. It runs inside the
-    /// control's update, so it may update any entity but the control.
+    /// `Imperative`). It runs once the control's update is over, so it may
+    /// update any entity, the control too.
     pub on_value_change: Option<ChangeCallback<Option<SharedString>>>,
+    /// Runs as the value is asked to change, before it does, inside the
+    /// control's update: `details.cancel()` stops it. It may update any
+    /// entity but the control.
+    pub on_before_value_change: Option<ChangeCallback<Option<SharedString>>>,
     /// Disables every item: they can't be focused or changed, and the value
     /// isn't submitted.
     pub disabled: bool,
@@ -94,6 +98,7 @@ impl Default for SegmentedControlOptions {
             value: None,
             default_value: None,
             on_value_change: None,
+            on_before_value_change: None,
             disabled: false,
             read_only: false,
             required: false,
@@ -122,6 +127,14 @@ impl SegmentedControlOptions {
         callback: impl Fn(&Option<SharedString>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&Option<SharedString>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 
@@ -212,6 +225,7 @@ fn radio_options(options: &SegmentedControlOptions) -> RadioGroupOptions {
         value: options.value.clone(),
         default_value: options.default_value.clone(),
         on_value_change: options.on_value_change.clone(),
+        on_before_value_change: options.on_before_value_change.clone(),
         disabled: options.disabled,
         read_only: options.read_only,
         required: options.required,

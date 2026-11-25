@@ -65,10 +65,13 @@ pub struct TimeInputOptions {
     /// its form resets.
     pub default_value: Option<Option<SharedString>>,
     /// Runs when the value wants to change: once every segment holds
-    /// something, and again with `None` when one is emptied.
-    /// `details.cancel()` keeps the value. It runs inside the input's update,
-    /// so it may update any entity but the input.
+    /// something, and again with `None` when one is emptied. It runs once the
+    /// input's update is over, so it may update any entity, the input too.
     pub on_value_change: Option<Rc<dyn Fn(&Option<SharedString>, &ChangeDetails, &mut Window, &mut App)>>,
+    /// Runs as the value is asked to change, before it does, inside the
+    /// input's update: `details.cancel()` keeps the value. It may update any
+    /// entity but the input.
+    pub on_before_value_change: Option<Rc<dyn Fn(&Option<SharedString>, &ChangeDetails, &mut Window, &mut App)>>,
     /// The smallest unit it shows. `Minute` by default.
     pub granularity: Option<TimeInputGranularity>,
     /// A 12 or 24 hour clock. Defaults to the locale's.
@@ -114,6 +117,14 @@ impl TimeInputOptions {
         callback: impl Fn(&Option<SharedString>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&Option<SharedString>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 
@@ -182,6 +193,7 @@ impl TimeInputOptions {
             value: self.value,
             default_value: self.default_value,
             on_value_change: self.on_value_change,
+            on_before_value_change: self.on_before_value_change,
             granularity: self.granularity.map(Into::into),
             hour_cycle: self.hour_cycle,
             min: self.min,

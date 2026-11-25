@@ -108,11 +108,15 @@ pub struct DatePickerOptions {
     pub default_value: Option<DatePickerValue>,
     /// Runs when a date is picked in the calendar (`ItemPress`), a typed date
     /// is committed on Enter or blur (`InputCommit`), a preset or Clear is
-    /// pressed (`PresetPress`, `ClearPress`), the form resets (`Reset`), or an
-    /// api call sets it (`Imperative`). A range changes once both ends are
-    /// set. `details.cancel()` keeps the value. It runs inside the date
-    /// picker's update, so it may update any entity but the date picker.
+    /// pressed (`PresetPress`, `ClearPress`), the form resets (`Reset`), or
+    /// an api call sets it (`Imperative`). A range changes once both ends are
+    /// set. It runs once the date picker's update is over, so it may update
+    /// any entity, the date picker too.
     pub on_value_change: Option<ChangeCallback<DatePickerValue>>,
+    /// Runs as the value is asked to change, before it does, inside the date
+    /// picker's update: `details.cancel()` keeps the value. It may update any
+    /// entity but the date picker.
+    pub on_before_value_change: Option<ChangeCallback<DatePickerValue>>,
     /// The first month the calendar shows, like `"2026-10"`. Pass it to
     /// control the calendar.
     pub month: Option<ISOMonth>,
@@ -228,6 +232,7 @@ impl Default for DatePickerOptions {
             value: None,
             default_value: None,
             on_value_change: None,
+            on_before_value_change: None,
             month: None,
             default_month: None,
             on_month_change: None,
@@ -292,6 +297,14 @@ impl DatePickerOptions {
         callback: impl Fn(&DatePickerValue, &ui_sdk_kernel::ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&DatePickerValue, &ui_sdk_kernel::ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 

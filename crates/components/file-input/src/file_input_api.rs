@@ -287,7 +287,7 @@ impl FileInput {
     }
 
     // Asks for the new value, with what the change added, removed and
-    // rejected in `on_value_change`'s details.
+    // rejected in `on_before_value_change`'s and `on_value_change`'s details.
     fn change_value(
         &mut self,
         next: Vec<File>,
@@ -296,16 +296,19 @@ impl FileInput {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> bool {
-        let callback: Option<ChangeCallback<Vec<File>>> = self.on_value_change.clone().map(|callback| {
-            let change = change.clone();
-            Rc::new(
-                move |value: &Vec<File>, details: &ChangeDetails, window: &mut Window, cx: &mut App| {
-                    let details = FileInputValueChangeDetails::new(details, &change);
-                    callback(value, &details, window, cx)
-                },
-            ) as ChangeCallback<Vec<File>>
-        });
-        self.value.set_on_change(callback);
+        let with_change = |callback: Option<crate::file_input::FileInputValueChange>| {
+            callback.map(|callback| {
+                let change = change.clone();
+                Rc::new(
+                    move |value: &Vec<File>, details: &ChangeDetails, window: &mut Window, cx: &mut App| {
+                        let details = FileInputValueChangeDetails::new(details, &change);
+                        callback(value, &details, window, cx)
+                    },
+                ) as ChangeCallback<Vec<File>>
+            })
+        };
+        self.value.set_on_change(with_change(self.on_value_change.clone()));
+        self.value.set_on_before_change(with_change(self.on_before_value_change.clone()));
         let changed = self.value.change(&self.instance, next, options, window, cx);
         if changed {
             cx.notify();

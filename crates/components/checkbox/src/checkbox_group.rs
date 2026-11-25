@@ -55,11 +55,14 @@ pub struct CheckboxGroupOptions {
     /// to them.
     pub default_value: Option<Vec<SharedString>>,
     /// Runs when a user or a form reset wants to change the value.
-    /// `details.reason` is `ItemPress`, `Reset` or `Imperative`, and
-    /// `details.cancel()` stops it. It runs inside the group's update, so it
-    /// may update any entity but the group and its checkboxes, which follow
-    /// the group.
+    /// `details.reason` is `ItemPress`, `Reset` or `Imperative`. It runs once
+    /// the group's update is over, so it may update any entity, the group and
+    /// its checkboxes too.
     pub on_value_change: Option<ChangeCallback<Vec<SharedString>>>,
+    /// Runs as the value is asked to change, before it does, inside the
+    /// group's update: `details.cancel()` stops it. It may update any entity
+    /// but the group and its checkboxes, which follow the group.
+    pub on_before_value_change: Option<ChangeCallback<Vec<SharedString>>>,
     /// Every value a parent checkbox checks. Without it, the parent checks the
     /// checkboxes in the group, once a frame has drawn them.
     pub all_values: Option<Vec<SharedString>>,
@@ -95,6 +98,14 @@ impl CheckboxGroupOptions {
         callback: impl Fn(&Vec<SharedString>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&Vec<SharedString>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 
@@ -202,9 +213,10 @@ impl CheckboxGroup {
             .clone()
             .or_else(|| options.default_value.clone())
             .unwrap_or_default();
-        let mut value = Controllable::new("value", first.clone());
+        let mut value = Controllable::new("value", first.clone()).after_update();
         value.set_controlled(options.value.clone());
         value.set_on_change(options.on_value_change.clone());
+        value.set_on_before_change(options.on_before_value_change.clone());
         let mut instance = Instance::new("checkbox").with_agent(cx);
         instance.set_label("checkbox-group");
         instance.debug = options.debug;
@@ -245,6 +257,7 @@ impl CheckboxGroup {
     pub fn set_options(&mut self, options: CheckboxGroupOptions, cx: &mut Context<Self>) {
         let mut changed = self.value.set_controlled(options.value);
         self.value.set_on_change(options.on_value_change);
+        self.value.set_on_before_change(options.on_before_value_change);
         // Like the native `defaultChecked`, changing it changes what a reset
         // returns to.
         if let Some(default) = &options.default_value {

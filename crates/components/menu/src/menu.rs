@@ -113,8 +113,9 @@ impl Debug for MenuCheckedChangeDetails<'_> {
     }
 }
 
-/// What a menu's `on_value_change` receives besides the new value: the
-/// change's details, with `cancel()`, and which group changed.
+/// What a menu's `on_value_change` and `on_before_value_change` receive
+/// besides the new value: the change's details, with `cancel()`, and which
+/// group changed.
 pub struct MenuValueChangeDetails<'a> {
     details: &'a ChangeDetails,
     /// The radio group's name: a data menu's group `name`, or the key a
@@ -453,8 +454,14 @@ pub struct MenuOptions<P: Clone + PartialEq + Debug + 'static = ()> {
     /// the item's value in `details.value`. Made for data menus.
     pub on_checked_change: Option<MenuCheckedChangeCallback>,
     /// Runs when any radio group in the menu or its submenus changes, with
-    /// the group in `details.group`. Made for data menus.
+    /// the group in `details.group`. Made for data menus. It runs once the
+    /// menu's update is over, so it may update any entity, the menu too.
     pub on_value_change: Option<MenuValueChangeCallback>,
+    /// Runs as any radio group in the menu or its submenus is asked to
+    /// change, before it does, inside the menu's update, with the group in
+    /// `details.group`: `details.cancel()` stops it. It may update any entity
+    /// but the menu.
+    pub on_before_value_change: Option<MenuValueChangeCallback>,
     /// The menu as data. Its items' shortcuts run while the menu is closed.
     pub items: Option<MenuData>,
     /// Whether a data menu runs its items' shortcuts while closed. Defaults
@@ -508,6 +515,7 @@ impl<P: Clone + PartialEq + Debug + 'static> Default for MenuOptions<P> {
             pending_announcement: None,
             on_checked_change: None,
             on_value_change: None,
+            on_before_value_change: None,
             items: None,
             item_shortcuts: true,
             r#loop: true,
@@ -536,6 +544,7 @@ impl<P: Clone + PartialEq + Debug + 'static> Clone for MenuOptions<P> {
             pending_announcement: self.pending_announcement.clone(),
             on_checked_change: self.on_checked_change.clone(),
             on_value_change: self.on_value_change.clone(),
+            on_before_value_change: self.on_before_value_change.clone(),
             items: self.items.clone(),
             item_shortcuts: self.item_shortcuts,
             r#loop: self.r#loop,
@@ -620,6 +629,14 @@ impl<P: Clone + PartialEq + Debug + 'static> MenuOptions<P> {
         callback: impl Fn(&SharedString, &MenuValueChangeDetails<'_>, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&SharedString, &MenuValueChangeDetails<'_>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 
@@ -713,6 +730,7 @@ impl<P: Clone + PartialEq + Debug + 'static> MenuOptions<P> {
             on_action: self.on_action.clone(),
             on_checked_change: self.on_checked_change.clone(),
             on_value_change: self.on_value_change.clone(),
+            on_before_value_change: self.on_before_value_change.clone(),
             pending_announcement: self.pending_announcement.clone(),
             modal: self.modal,
             presentation: self.presentation,

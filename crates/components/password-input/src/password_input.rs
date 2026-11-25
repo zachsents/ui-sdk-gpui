@@ -49,9 +49,13 @@ pub struct PasswordInputOptions {
     pub default_value: Option<SharedString>,
     /// Called when the user changes the password: typing (`InputChange`), a
     /// Clear part (`ClearPress`), a form reset (`Reset`) or a call
-    /// (`Imperative`). `details.cancel()` keeps it as it was. It runs inside
-    /// the password input's update, so it may update any entity but it.
+    /// (`Imperative`). It runs once the password input's update is over, so
+    /// it may update any entity, the password input too.
     pub on_value_change: Option<ChangeCallback<SharedString>>,
+    /// Runs as the password is asked to change, before it does, inside the
+    /// password input's update: `details.cancel()` keeps it as it was. It may
+    /// update any entity but the password input.
+    pub on_before_value_change: Option<ChangeCallback<SharedString>>,
     /// Whether the password is shown. Pass it to control it.
     pub visible: Option<bool>,
     /// Whether the password is shown at first, when uncontrolled.
@@ -110,6 +114,14 @@ impl PasswordInputOptions {
         callback: impl Fn(&SharedString, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&SharedString, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 
@@ -201,6 +213,7 @@ impl PasswordInputOptions {
             value: self.value.clone(),
             default_value: self.default_value.clone(),
             on_value_change: self.on_value_change.clone(),
+            on_before_value_change: self.on_before_value_change.clone(),
         }
     }
 

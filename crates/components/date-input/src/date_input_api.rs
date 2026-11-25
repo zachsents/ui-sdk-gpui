@@ -56,6 +56,7 @@ pub struct SharedOptions {
     /// its form resets.
     pub default_value: Option<Option<SharedString>>,
     pub on_value_change: Option<ChangeCallback<Option<SharedString>>>,
+    pub on_before_value_change: Option<ChangeCallback<Option<SharedString>>>,
     pub granularity: Option<DateInputGranularity>,
     pub hour_cycle: Option<HourCycle>,
     pub min: Option<SharedString>,
@@ -248,7 +249,7 @@ impl DateInputCore {
             .clone()
             .or_else(|| options.default_value.clone())
             .flatten();
-        let mut value = Controllable::new("value", value_for(kind, &options, first.as_ref()));
+        let mut value = Controllable::new("value", value_for(kind, &options, first.as_ref())).after_update();
         value.set_controlled(
             options
                 .value
@@ -256,6 +257,7 @@ impl DateInputCore {
                 .map(|value| value_for(kind, &options, value.as_ref())),
         );
         value.set_on_change(options.on_value_change.clone());
+        value.set_on_before_change(options.on_before_value_change.clone());
         let initial = value_for(kind, &options, options.default_value.clone().flatten().as_ref());
         let internals = ElementInternals::new(cx);
         let weak = cx.weak_entity();
@@ -405,6 +407,7 @@ impl DateInputCore {
                 .map(|value| value_for(kind, options, value.as_ref())),
         );
         self.value.set_on_change(options.on_value_change.clone());
+        self.value.set_on_before_change(options.on_before_value_change.clone());
         // A field whose options are the same is left alone, so a style is
         // synced whether or not anything else changed.
         self.sync_field_options(cx);

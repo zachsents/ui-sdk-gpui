@@ -40,9 +40,13 @@ pub struct RadioGroupOptions {
     pub default_value: Option<Option<SharedString>>,
     /// Runs when a user or a form reset wants to change the value.
     /// `details.reason` says why (`ItemPress`, `ListNavigation`, `Reset`,
-    /// `Imperative`), and `details.cancel()` stops it. It runs inside the
-    /// group's update, so it may update any entity but the group.
+    /// `Imperative`). It runs once the group's update is over, so it may
+    /// update any entity, the group too.
     pub on_value_change: Option<ChangeCallback<Option<SharedString>>>,
+    /// Runs as the value is asked to change, before it does, inside the
+    /// group's update: `details.cancel()` stops it. It may update any entity
+    /// but the group.
+    pub on_before_value_change: Option<ChangeCallback<Option<SharedString>>>,
     /// Disables every radio like native ones: they can't be focused or
     /// changed, and the value isn't submitted.
     pub disabled: bool,
@@ -73,6 +77,7 @@ impl Default for RadioGroupOptions {
             value: None,
             default_value: None,
             on_value_change: None,
+            on_before_value_change: None,
             disabled: false,
             read_only: false,
             required: false,
@@ -101,6 +106,14 @@ impl RadioGroupOptions {
         callback: impl Fn(&Option<SharedString>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&Option<SharedString>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 

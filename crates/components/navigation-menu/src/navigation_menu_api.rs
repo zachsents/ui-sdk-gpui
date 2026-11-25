@@ -284,9 +284,10 @@ pub struct NavigationMenu {
 
 impl NavigationMenu {
     pub fn new(options: NavigationMenuOptions, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let mut value = Controllable::new("value", options.default_value.clone());
+        let mut value = Controllable::new("value", options.default_value.clone()).after_update();
         value.set_controlled(options.value.clone());
         value.set_on_change(options.on_value_change.clone());
+        value.set_on_before_change(options.on_before_value_change.clone());
         let mut instance = Instance::new("navigation-menu").with_agent(cx);
         instance.debug = options.debug;
         // The viewport and the contents coming and going render the menu
@@ -402,6 +403,7 @@ impl NavigationMenu {
     pub fn set_options(&mut self, options: NavigationMenuOptions, window: &mut Window, cx: &mut Context<Self>) {
         let mut changed = self.value.set_controlled(options.value);
         self.value.set_on_change(options.on_value_change);
+        self.value.set_on_before_change(options.on_before_value_change);
         let orientation = orientation_of(options.orientation, Orientation::Horizontal);
         changed |= self.orientation != orientation || self.open_on_hover != options.open_on_hover;
         self.orientation = orientation;

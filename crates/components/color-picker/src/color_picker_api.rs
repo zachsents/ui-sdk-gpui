@@ -107,7 +107,7 @@ pub(crate) fn on_step(value: f64, step: f64) -> f64 {
     round_to(value, (-step.log10().floor()).max(0.0) as i32)
 }
 
-// `on_value_change` with the color the value is.
+// `on_value_change` or `on_before_value_change` with the color the value is.
 fn change_callback(
     callback: Option<ColorPickerValueChange>,
     color: Color,
@@ -207,6 +207,8 @@ impl ColorPicker {
         let public = self.public_color(&color);
         self.value
             .set_on_change(change_callback(self.on_value_change.clone(), public));
+        self.value
+            .set_on_before_change(change_callback(self.on_before_value_change.clone(), public));
         let done = self
             .value
             .change(&self.instance, value.clone(), options, window, cx);

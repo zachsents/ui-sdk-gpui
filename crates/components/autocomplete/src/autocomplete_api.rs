@@ -178,15 +178,25 @@ fn popup_options(options: &AutocompleteOptions) -> PopupOptions<()> {
     popup
 }
 
-// `on_value_change`, with the suggestion a choice reports (`details.item`).
-fn value_callback(
+// `on_before_value_change`, with the suggestion a choice reports
+// (`details.item`).
+fn before_callback(
     options: &AutocompleteOptions,
     chosen: &Rc<RefCell<Option<AutocompleteChosen>>>,
 ) -> Option<ChangeCallback<SharedString>> {
-    let callback = options.on_value_change.clone()?;
+    let callback = options.on_before_value_change.clone()?;
     let chosen = chosen.clone();
     Some(Rc::new(move |value, details, window, cx| {
         let item = chosen.borrow().clone();
+        callback(value, details, item.as_ref(), window, cx)
+    }))
+}
+
+// `on_value_change`, with the suggestion the change chose, which it hears
+// once the update is over.
+fn value_callback(options: &AutocompleteOptions, item: Option<AutocompleteChosen>) -> Option<ChangeCallback<SharedString>> {
+    let callback = options.on_value_change.clone()?;
+    Some(Rc::new(move |value, details, window, cx| {
         callback(value, details, item.as_ref(), window, cx)
     }))
 }
@@ -235,9 +245,10 @@ impl Autocomplete {
             .or_else(|| options.default_value.clone())
             .unwrap_or_default();
         let chosen: Rc<RefCell<Option<AutocompleteChosen>>> = Rc::default();
-        let mut value = Controllable::new("value", starting.clone());
+        let mut value = Controllable::new("value", starting.clone()).after_update();
         value.set_controlled(options.value.clone());
-        value.set_on_change(value_callback(&options, &chosen));
+        value.set_on_change(value_callback(&options, None));
+        value.set_on_before_change(before_callback(&options, &chosen));
 
         let field = cx.new(|cx| TextField::new(field_options(&options, &starting, options.disabled), window, cx));
         let field_handle = field.read(cx).focus_handle(cx);
@@ -501,7 +512,8 @@ impl Autocomplete {
             self.initial = initial.clone();
         }
         changed |= self.value.set_controlled(options.value.clone());
-        self.value.set_on_change(value_callback(&options, &self.chosen));
+        self.value.set_on_change(value_callback(&options, None));
+        self.value.set_on_before_change(before_callback(&options, &self.chosen));
         changed |= self.popup.set_options(popup_options(&options), cx);
         self.options = options;
         // Data that drops the highlighted suggestion settles the highlight
@@ -641,6 +653,7 @@ impl Autocomplete {
         self.core.cause(reason, event.clone());
         let query = query.unwrap_or_else(|| value.clone());
         let done = &value == self.value.get() || {
+            self.value.set_on_change(value_callback(&self.options, item.clone()));
             *self.chosen.borrow_mut() = item;
             let options = ChangeOptions {
                 reason: Some(reason),

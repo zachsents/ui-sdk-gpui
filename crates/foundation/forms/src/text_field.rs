@@ -38,10 +38,13 @@ pub struct TextFieldOptions {
     pub default_value: Option<SharedString>,
     /// Called when the user changes the value: typing (`InputChange`), a
     /// Clear part (`ClearPress`), a form reset (`Reset`) or a controller
-    /// (`Imperative`). `details.cancel()` keeps the value as it was. It runs
-    /// inside the component's update, so it may update any entity but the
-    /// component.
+    /// (`Imperative`). It runs once the component's update is over, so it may
+    /// update any entity, the component too.
     pub on_value_change: Option<ChangeCallback<SharedString>>,
+    /// Runs as the value is asked to change, before it does, inside the
+    /// component's update: `details.cancel()` keeps the value as it was. It
+    /// may update any entity but the component.
+    pub on_before_value_change: Option<ChangeCallback<SharedString>>,
 }
 
 impl TextFieldOptions {
@@ -60,6 +63,14 @@ impl TextFieldOptions {
         callback: impl Fn(&SharedString, &ui_sdk_kernel::ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&SharedString, &ui_sdk_kernel::ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 }
@@ -173,9 +184,10 @@ impl TextFieldApi {
     /// textarea's, doesn't take part in implicit submission.
     pub fn new<T: TextFieldHost>(options: TextFieldOptions, multiline: bool, cx: &mut Context<T>) -> Self {
         let initial = initial_text(&options);
-        let mut value = Controllable::new("value", initial.value);
+        let mut value = Controllable::new("value", initial.value).after_update();
         value.set_controlled(options.value.clone());
         value.set_on_change(options.on_value_change.clone());
+        value.set_on_before_change(options.on_before_value_change.clone());
         let internals = ElementInternals::new(cx);
         internals.set_blocks_implicit_submission(!multiline);
         let reset = internals.on_reset(cx, |host: &mut T, window, cx| {
@@ -221,6 +233,7 @@ impl TextFieldApi {
     pub fn set_options(&mut self, options: TextFieldOptions) -> bool {
         let changed = self.value.set_controlled(options.value);
         self.value.set_on_change(options.on_value_change);
+        self.value.set_on_before_change(options.on_before_value_change);
         self.default_value = options.default_value;
         if changed {
             self.ahead = None;

@@ -238,9 +238,10 @@ impl<T: ItemKey + Clone + PartialEq + Debug + 'static> Select<T> {
             .clone()
             .or_else(|| options.default_value.clone())
             .unwrap_or_else(|| empty.clone());
-        let mut value = Controllable::new("value", first.clone());
+        let mut value = Controllable::new("value", first.clone()).after_update();
         value.set_controlled(options.value.clone());
         value.set_on_change(options.on_value_change.clone());
+        value.set_on_before_change(options.on_before_value_change.clone());
         let mut query = Controllable::new(
             "query",
             options.query.clone().unwrap_or_else(|| options.default_query.clone()),
@@ -573,6 +574,7 @@ impl<T: ItemKey + Clone + PartialEq + Debug + 'static> Select<T> {
         }
         changed |= self.value.set_controlled(options.value.clone());
         self.value.set_on_change(options.on_value_change.clone());
+        self.value.set_on_before_change(options.on_before_value_change.clone());
         // Like a native select's default, changing it changes what a reset
         // returns to.
         if let Some(default) = &options.default_value {

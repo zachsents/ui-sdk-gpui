@@ -17,7 +17,7 @@ use ui_sdk_lists::{HighlightCause, HighlightOptions, SearchFilter};
 use crate::command::{Command, CommandActionDetails, CommandItemProps, CommandValueChange, CommandValueChangeDetails};
 use crate::command_data::find_command;
 
-// `on_value_change` with where the command is.
+// `on_value_change` or `on_before_value_change` with where the command is.
 fn value_callback(callback: Option<CommandValueChange>, index: Option<usize>) -> Option<ChangeCallback<Option<SharedString>>> {
     let callback = callback?;
     Some(Rc::new(
@@ -69,6 +69,8 @@ impl Command {
         let index = self.index_of(key.as_ref());
         self.value
             .set_on_change(value_callback(self.on_value_change.clone(), index));
+        self.value
+            .set_on_before_change(value_callback(self.on_before_value_change.clone(), index));
         let options = ChangeOptions {
             reason: Some(why.reason),
             source: None,

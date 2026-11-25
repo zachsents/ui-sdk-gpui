@@ -41,10 +41,14 @@ pub struct ToggleGroupOptions {
     /// The toggles pressed at first, when uncontrolled.
     pub default_value: Vec<SharedString>,
     /// Runs when a toggle wants to be pressed or unpressed. `details.reason`
-    /// is `ItemPress` or `Imperative`, and `details.cancel()` stops it. It
-    /// runs inside the group's update, and inside the toggle's for a press,
-    /// so it may update any entity but those two.
+    /// is `ItemPress` or `Imperative`. It runs once the group's update is
+    /// over, and the toggle's for a press, so it may update any entity, those
+    /// two too.
     pub on_value_change: Option<ChangeCallback<Vec<SharedString>>>,
+    /// Runs as a toggle is asked to be pressed or unpressed, before it is,
+    /// inside the group's update, and inside the toggle's for a press:
+    /// `details.cancel()` stops it. It may update any entity but those two.
+    pub on_before_value_change: Option<ChangeCallback<Vec<SharedString>>>,
     /// Whether several toggles can be pressed at once. Otherwise pressing
     /// one unpresses the others.
     pub multiple: bool,
@@ -75,6 +79,7 @@ impl Default for ToggleGroupOptions {
             value: None,
             default_value: Vec::new(),
             on_value_change: None,
+            on_before_value_change: None,
             multiple: false,
             deselectable: true,
             disabled: false,
@@ -102,6 +107,14 @@ impl ToggleGroupOptions {
         callback: impl Fn(&Vec<SharedString>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&Vec<SharedString>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 
@@ -247,9 +260,10 @@ pub struct ToggleGroup {
 
 impl ToggleGroup {
     pub fn new(options: ToggleGroupOptions, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let mut value = Controllable::new("value", options.default_value.clone());
+        let mut value = Controllable::new("value", options.default_value.clone()).after_update();
         value.set_controlled(options.value.clone());
         value.set_on_change(options.on_value_change.clone());
+        value.set_on_before_change(options.on_before_value_change.clone());
         // The group's primitive is named "toggle", so its part is
         // "toggle-group".
         let mut instance = Instance::new("toggle").with_agent(cx);
@@ -302,6 +316,7 @@ impl ToggleGroup {
     pub fn set_options(&mut self, options: ToggleGroupOptions, cx: &mut Context<Self>) {
         let mut changed = self.value.set_controlled(options.value);
         self.value.set_on_change(options.on_value_change);
+        self.value.set_on_before_change(options.on_before_value_change);
         let orientation = orientation_of(options.orientation, Orientation::Horizontal);
         changed |= self.multiple != options.multiple
             || self.deselectable != options.deselectable

@@ -52,12 +52,15 @@ pub struct CalendarOptions {
     pub value: Option<CalendarValue>,
     /// The value it starts with, when uncontrolled.
     pub default_value: Option<CalendarValue>,
-    /// Runs when a date is pressed (`ItemPress`), with Enter or Space too,
-    /// or an api call sets the value (`Imperative`). A range changes once
-    /// both ends are picked. `details.cancel()` keeps the value. It runs
-    /// inside the calendar's update, so it may update any entity but the
-    /// calendar.
+    /// Runs when a date is pressed (`ItemPress`), with Enter or Space too, or
+    /// an api call sets the value (`Imperative`). A range changes once both
+    /// ends are picked. It runs once the calendar's update is over, so it may
+    /// update any entity, the calendar too.
     pub on_value_change: Option<ChangeCallback<CalendarValue>>,
+    /// Runs as the value is asked to change, before it does, inside the
+    /// calendar's update: `details.cancel()` keeps the value. It may update
+    /// any entity but the calendar.
+    pub on_before_value_change: Option<ChangeCallback<CalendarValue>>,
     /// The first month shown, like `"2026-10"`. Pass it to control the
     /// calendar.
     pub month: Option<ISOMonth>,
@@ -135,6 +138,7 @@ impl Default for CalendarOptions {
             value: None,
             default_value: None,
             on_value_change: None,
+            on_before_value_change: None,
             month: None,
             default_month: None,
             on_month_change: None,
@@ -185,6 +189,14 @@ impl CalendarOptions {
         callback: impl Fn(&CalendarValue, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&CalendarValue, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 

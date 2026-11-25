@@ -45,9 +45,13 @@ pub struct RatingOptions {
     pub default_value: Option<Option<f64>>,
     /// Runs when a user or a form reset wants to change the score.
     /// `details.reason` says why (`ItemPress`, `ListNavigation`, `Reset`,
-    /// `Imperative`), and `details.cancel()` stops it. It runs inside the
-    /// rating's update, so it may update any entity but the rating.
+    /// `Imperative`). It runs once the rating's update is over, so it may
+    /// update any entity, the rating too.
     pub on_value_change: Option<ChangeCallback<Option<f64>>>,
+    /// Runs as the score is asked to change, before it does, inside the
+    /// rating's update: `details.cancel()` stops it. It may update any entity
+    /// but the rating.
+    pub on_before_value_change: Option<ChangeCallback<Option<f64>>>,
     /// How many stars there are. Defaults to 5.
     pub max: usize,
     /// The smallest change, as a fraction of a star: `0.5` makes half stars,
@@ -85,6 +89,7 @@ impl Default for RatingOptions {
             value: None,
             default_value: None,
             on_value_change: None,
+            on_before_value_change: None,
             max: 5,
             step: 1.0,
             deselectable: false,
@@ -116,6 +121,14 @@ impl RatingOptions {
         callback: impl Fn(&Option<f64>, &ChangeDetails, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_value_change = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_before_value_change(
+        mut self,
+        callback: impl Fn(&Option<f64>, &ChangeDetails, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_before_value_change = Some(Rc::new(callback));
         self
     }
 
@@ -259,15 +272,18 @@ fn parts_per_star(step: f64) -> usize {
 // Rating keys its radios by score as text, so Radio's api and parts run it
 // unchanged.
 fn radio_options(options: &RatingOptions) -> RadioGroupOptions {
-    let on_value_change = options.on_value_change.clone().map(|callback| -> ChangeCallback<Option<SharedString>> {
-        Rc::new(move |key: &Option<SharedString>, details: &ChangeDetails, window: &mut Window, cx: &mut App| {
-            callback(&score_of(key.as_ref()), details, window, cx)
+    let by_score = |callback: &Option<ChangeCallback<Option<f64>>>| {
+        callback.clone().map(|callback| -> ChangeCallback<Option<SharedString>> {
+            Rc::new(move |key: &Option<SharedString>, details: &ChangeDetails, window: &mut Window, cx: &mut App| {
+                callback(&score_of(key.as_ref()), details, window, cx)
+            })
         })
-    });
+    };
     RadioGroupOptions {
         value: options.value.map(key_of),
         default_value: options.default_value.map(key_of),
-        on_value_change,
+        on_value_change: by_score(&options.on_value_change),
+        on_before_value_change: by_score(&options.on_before_value_change),
         disabled: options.disabled,
         read_only: options.read_only,
         required: options.required,
